@@ -1,0 +1,95 @@
+Crie um website responsivo (mobile-first) para uma professora do ensino fundamental (4º ano) gerenciar chamadas e atividades dos alunos.
+
+🎯 Objetivo do sistema
+
+O sistema deve permitir que a professora:
+
+Faça chamada de alunos de forma rápida (principal funcionalidade)
+Gerencie atividades (para casa e sala)
+Acompanhe entregas por aluno
+Visualize relatórios simples
+
+O foco principal é usabilidade no celular, com interface simples, botões grandes e navegação intuitiva.
+
+🔐 Autenticação
+Tela de login simples
+Após login, redirecionar direto para a tela de chamada
+Não precisa cadastro complexo (pode ser mockado inicialmente)
+🧭 Layout principal
+Menu lateral (hamburger no mobile)
+Estrutura com as seguintes seções:
+Chamada
+Diário
+Atividades
+Relatórios
+✅ Tela 1: Chamada (principal)
+Estado inicial:
+Lista vazia
+Botão: “Adicionar aluno”
+Ao adicionar aluno:
+Campo: Nome do aluno
+Após salvar, aluno já aparece na lista
+Lista de alunos:
+Cada aluno aparece como um botão grande (mobile-friendly)
+Interação:
+Clique no aluno = marcar falta
+Visual deve mudar (ex: vermelho ou riscado)
+Possibilidade de alternar presença/falta
+📅 Tela 2: Diário
+Tabela estilo presença:
+Linhas: alunos
+Colunas: dias
+Marcação visual de presença/falta
+Scroll horizontal (importante no mobile)
+📚 Tela 3: Atividades
+Estrutura:
+Lista de matérias
+Ao clicar → abre sub-menu com atividades
+Visual das atividades:
+Organizadas por data (tipo agenda)
+Cada atividade contém:
+Tipo: “Para casa” ou “Sala”
+Link (Google Docs ou PDF)
+Ao clicar na atividade:
+Botões:
+“Visualizar” (abrir link)
+“Marcar entrega”
+Marcar entrega:
+Lista de alunos
+Clique no aluno = marcar como entregue
+(oposto da chamada: aqui marca quem entregou)
+➕ Adicionar atividade
+
+Campos:
+
+Matéria
+Tipo (casa ou sala)
+Link da atividade
+Data
+📊 Tela 4: Relatórios
+Relatório de entregas:
+Lista de alunos
+Ao clicar em um aluno:
+Exibir todas atividades do dia
+Mostrar status:
+Entregue
+Não entregue
+Visual estilo “checklist” (tipo visto escolar)
+🧠 Regras importantes
+Interface extremamente simples (professora usando no dia a dia)
+Botões grandes (uso no celular)
+Feedback visual claro (cores, check, etc.)
+Dados podem ser mockados inicialmente
+Estrutura preparada para evoluir (ex: adicionar notas no futuro)
+🎨 Design
+Clean e moderno
+Cores suaves
+Destaque para ações principais
+UX focado em rapidez (poucos cliques)
+💡 Extras (se possível)
+Persistência local (localStorage ou mock API)
+Transições suaves
+Ícones simples
+⚠️ Observação importante
+
+Esse sistema não precisa de complexidade acadêmica (notas, médias, etc.) neste momento — o foco é presença e entrega de atividades.

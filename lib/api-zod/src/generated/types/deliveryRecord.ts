@@ -6,6 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
+export interface DeliveryRecord {
+  id: string;
+  activityId: string;
+  studentId: string;
+  delivered: boolean;
+  createdAt: string;
 }

@@ -1,22 +1,28 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: API specification for Caderneta da Professora
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: students
+    description: Student management
+  - name: attendance
+    description: Attendance tracking
+  - name: activities
+    description: Activity management
+  - name: deliveries
+    description: Activity delivery tracking
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +30,179 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /students:
+    get:
+      operationId: listStudents
+      tags: [students]
+      summary: List all students
+      responses:
+        "200":
+          description: List of students
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Student"
+    post:
+      operationId: createStudent
+      tags: [students]
+      summary: Create a student
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStudentRequest"
+      responses:
+        "201":
+          description: Student created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Student"
+
+  /students/{id}:
+    delete:
+      operationId: deleteStudent
+      tags: [students]
+      summary: Delete a student
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Student deleted
+
+  /attendance:
+    get:
+      operationId: listAttendance
+      tags: [attendance]
+      summary: List attendance records
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Attendance records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AttendanceRecord"
+    post:
+      operationId: upsertAttendance
+      tags: [attendance]
+      summary: Upsert attendance record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertAttendanceRequest"
+      responses:
+        "200":
+          description: Attendance record upserted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceRecord"
+
+  /activities:
+    get:
+      operationId: listActivities
+      tags: [activities]
+      summary: List all activities
+      responses:
+        "200":
+          description: List of activities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Activity"
+    post:
+      operationId: createActivity
+      tags: [activities]
+      summary: Create an activity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateActivityRequest"
+      responses:
+        "201":
+          description: Activity created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Activity"
+
+  /activities/{id}:
+    delete:
+      operationId: deleteActivity
+      tags: [activities]
+      summary: Delete an activity
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Activity deleted
+
+  /deliveries:
+    get:
+      operationId: listDeliveries
+      tags: [deliveries]
+      summary: List delivery records
+      parameters:
+        - name: activityId
+          in: query
+          schema:
+            type: string
+        - name: studentId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Delivery records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeliveryRecord"
+    post:
+      operationId: upsertDelivery
+      tags: [deliveries]
+      summary: Upsert a delivery record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertDeliveryRequest"
+      responses:
+        "200":
+          description: Delivery record upserted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeliveryRecord"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +213,138 @@ components:
       required:
         - status
 
+    Student:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - createdAt
+
+    CreateStudentRequest:
+      type: object
+      properties:
+        name:
+          type: string
+      required:
+        - name
+
+    AttendanceRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        studentId:
+          type: string
+        date:
+          type: string
+        present:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - studentId
+        - date
+        - present
+        - createdAt
+
+    UpsertAttendanceRequest:
+      type: object
+      properties:
+        studentId:
+          type: string
+        date:
+          type: string
+        present:
+          type: boolean
+      required:
+        - studentId
+        - date
+        - present
+
+    Activity:
+      type: object
+      properties:
+        id:
+          type: string
+        subject:
+          type: string
+        type:
+          type: string
+          enum: [homework, classwork]
+        link:
+          type: string
+        date:
+          type: string
+        description:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - subject
+        - type
+        - date
+        - description
+        - createdAt
+
+    CreateActivityRequest:
+      type: object
+      properties:
+        subject:
+          type: string
+        type:
+          type: string
+          enum: [homework, classwork]
+        link:
+          type: string
+        date:
+          type: string
+        description:
+          type: string
+      required:
+        - subject
+        - type
+        - date
+        - description
+
+    DeliveryRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        activityId:
+          type: string
+        studentId:
+          type: string
+        delivered:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - activityId
+        - studentId
+        - delivered
+        - createdAt
+
+    UpsertDeliveryRequest:
+      type: object
+      properties:
+        activityId:
+          type: string
+        studentId:
+          type: string
+        delivered:
+          type: boolean
+      required:
+        - activityId
+        - studentId
+        - delivered
