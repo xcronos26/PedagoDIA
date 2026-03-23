@@ -11,6 +11,8 @@ export type AttendanceRecord = {
   studentId: string;
   date: string;
   present: boolean;
+  justified?: boolean;
+  justification?: string;
 };
 
 export type Activity = {
@@ -27,24 +29,34 @@ export type DeliveryRecord = {
   activityId: string;
   studentId: string;
   delivered: boolean;
+  seen: boolean;
+  deliveredAt?: string;
+  seenAt?: string;
 };
+
+const DEFAULT_SUBJECTS = ['Matemática', 'Português', 'Ciências', 'História', 'Geografia', 'Arte', 'Educação Física', 'Inglês'];
 
 interface AppContextValue {
   students: Student[];
   attendance: AttendanceRecord[];
   activities: Activity[];
   deliveries: DeliveryRecord[];
+  subjects: string[];
   isLoaded: boolean;
   loadData: () => Promise<void>;
   addStudent: (name: string) => Promise<void>;
   removeStudent: (id: string) => Promise<void>;
   toggleAttendance: (studentId: string, date: string) => Promise<void>;
+  justifyAbsence: (studentId: string, date: string, justification: string) => Promise<void>;
+  setAttendanceRecord: (studentId: string, date: string, present: boolean) => Promise<void>;
   getAttendanceForDate: (date: string) => AttendanceRecord[];
   addActivity: (activity: Omit<Activity, 'id' | 'createdAt'>) => Promise<void>;
   removeActivity: (id: string) => Promise<void>;
   toggleDelivery: (activityId: string, studentId: string) => Promise<void>;
+  toggleSeen: (activityId: string, studentId: string) => Promise<void>;
   getDeliveriesForActivity: (activityId: string) => DeliveryRecord[];
   getDeliveriesForStudent: (studentId: string) => DeliveryRecord[];
+  addSubject: (subject: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -54,6 +66,7 @@ const STORAGE_KEYS = {
   ATTENDANCE: '@caderneta:attendance',
   ACTIVITIES: '@caderneta:activities',
   DELIVERIES: '@caderneta:deliveries',
+  SUBJECTS: '@caderneta:subjects',
 };
 
 function generateId() {
@@ -65,20 +78,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [deliveries, setDeliveries] = useState<DeliveryRecord[]>([]);
+  const [subjects, setSubjects] = useState<string[]>(DEFAULT_SUBJECTS);
   const [isLoaded, setIsLoaded] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
-      const [studentsJson, attendanceJson, activitiesJson, deliveriesJson] = await Promise.all([
+      const [studentsJson, attendanceJson, activitiesJson, deliveriesJson, subjectsJson] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.STUDENTS),
         AsyncStorage.getItem(STORAGE_KEYS.ATTENDANCE),
         AsyncStorage.getItem(STORAGE_KEYS.ACTIVITIES),
         AsyncStorage.getItem(STORAGE_KEYS.DELIVERIES),
+        AsyncStorage.getItem(STORAGE_KEYS.SUBJECTS),
       ]);
       if (studentsJson) setStudents(JSON.parse(studentsJson));
-      if (attendanceJson) setAttendance(JSON.parse(attendanceJson));
+      if (attendanceJson) {
+        const parsed: AttendanceRecord[] = JSON.parse(attendanceJson);
+        setAttendance(parsed);
+      }
       if (activitiesJson) setActivities(JSON.parse(activitiesJson));
-      if (deliveriesJson) setDeliveries(JSON.parse(deliveriesJson));
+      if (deliveriesJson) {
+        const parsed: DeliveryRecord[] = JSON.parse(deliveriesJson);
+        // Migrate old records that don't have seen field
+        setDeliveries(parsed.map(d => ({ seen: false, ...d })));
+      }
+      if (subjectsJson) setSubjects(JSON.parse(subjectsJson));
     } catch (e) {
       console.error('Failed to load data', e);
     } finally {
@@ -106,13 +129,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDeliveries(data);
   };
 
+  const saveSubjects = async (data: string[]) => {
+    await AsyncStorage.setItem(STORAGE_KEYS.SUBJECTS, JSON.stringify(data));
+    setSubjects(data);
+  };
+
   const addStudent = useCallback(async (name: string) => {
     const newStudent: Student = {
       id: generateId(),
       name: name.trim(),
       createdAt: new Date().toISOString(),
     };
-    const updated = [...students, newStudent].sort((a, b) => a.name.localeCompare(b.name));
+    const updated = [...students, newStudent].sort((a, b) =>
+      a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })
+    );
     await saveStudents(updated);
   }, [students]);
 
@@ -128,11 +158,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (existing) {
       updated = attendance.map(a =>
         a.studentId === studentId && a.date === date
-          ? { ...a, present: !a.present }
+          ? { ...a, present: !a.present, justified: false, justification: undefined }
           : a
       );
     } else {
-      updated = [...attendance, { studentId, date, present: false }];
+      updated = [...attendance, { studentId, date, present: false, justified: false }];
+    }
+    await saveAttendance(updated);
+  }, [attendance]);
+
+  const setAttendanceRecord = useCallback(async (studentId: string, date: string, present: boolean) => {
+    const existing = attendance.find(a => a.studentId === studentId && a.date === date);
+    let updated: AttendanceRecord[];
+    if (existing) {
+      updated = attendance.map(a =>
+        a.studentId === studentId && a.date === date
+          ? { ...a, present, justified: false, justification: undefined }
+          : a
+      );
+    } else {
+      updated = [...attendance, { studentId, date, present, justified: false }];
+    }
+    await saveAttendance(updated);
+  }, [attendance]);
+
+  const justifyAbsence = useCallback(async (studentId: string, date: string, justification: string) => {
+    const existing = attendance.find(a => a.studentId === studentId && a.date === date);
+    let updated: AttendanceRecord[];
+    if (existing) {
+      updated = attendance.map(a =>
+        a.studentId === studentId && a.date === date
+          ? { ...a, present: false, justified: true, justification }
+          : a
+      );
+    } else {
+      updated = [...attendance, { studentId, date, present: false, justified: true, justification }];
     }
     await saveAttendance(updated);
   }, [attendance]);
@@ -160,13 +220,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const existing = deliveries.find(d => d.activityId === activityId && d.studentId === studentId);
     let updated: DeliveryRecord[];
     if (existing) {
+      const nowDelivered = !existing.delivered;
       updated = deliveries.map(d =>
         d.activityId === activityId && d.studentId === studentId
-          ? { ...d, delivered: !d.delivered }
+          ? { ...d, delivered: nowDelivered, deliveredAt: nowDelivered ? new Date().toISOString() : undefined }
           : d
       );
     } else {
-      updated = [...deliveries, { activityId, studentId, delivered: true }];
+      updated = [...deliveries, {
+        activityId,
+        studentId,
+        delivered: true,
+        seen: false,
+        deliveredAt: new Date().toISOString(),
+      }];
+    }
+    await saveDeliveries(updated);
+  }, [deliveries]);
+
+  const toggleSeen = useCallback(async (activityId: string, studentId: string) => {
+    const existing = deliveries.find(d => d.activityId === activityId && d.studentId === studentId);
+    let updated: DeliveryRecord[];
+    if (existing) {
+      const nowSeen = !existing.seen;
+      updated = deliveries.map(d =>
+        d.activityId === activityId && d.studentId === studentId
+          ? { ...d, seen: nowSeen, seenAt: nowSeen ? new Date().toISOString() : undefined }
+          : d
+      );
+    } else {
+      updated = [...deliveries, {
+        activityId,
+        studentId,
+        delivered: false,
+        seen: true,
+        seenAt: new Date().toISOString(),
+      }];
     }
     await saveDeliveries(updated);
   }, [deliveries]);
@@ -179,23 +268,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return deliveries.filter(d => d.studentId === studentId);
   }, [deliveries]);
 
+  const addSubject = useCallback(async (subject: string) => {
+    const trimmed = subject.trim();
+    if (!trimmed || subjects.includes(trimmed)) return;
+    const updated = [...subjects, trimmed].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    await saveSubjects(updated);
+  }, [subjects]);
+
   return (
     <AppContext.Provider value={{
       students,
       attendance,
       activities,
       deliveries,
+      subjects,
       isLoaded,
       loadData,
       addStudent,
       removeStudent,
       toggleAttendance,
+      justifyAbsence,
+      setAttendanceRecord,
       getAttendanceForDate,
       addActivity,
       removeActivity,
       toggleDelivery,
+      toggleSeen,
       getDeliveriesForActivity,
       getDeliveriesForStudent,
+      addSubject,
     }}>
       {children}
     </AppContext.Provider>

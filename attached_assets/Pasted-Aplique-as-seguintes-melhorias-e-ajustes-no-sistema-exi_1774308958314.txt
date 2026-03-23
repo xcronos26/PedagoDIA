@@ -1,0 +1,87 @@
+Aplique as seguintes melhorias e ajustes no sistema existente, mantendo toda a estrutura atual e apenas evoluindo as funcionalidades:
+
+✅ 1. CHAMADA (ORDENAÇÃO AUTOMÁTICA)
+A lista de alunos deve sempre permanecer em ordem alfabética (A-Z)
+Ao adicionar um novo aluno:
+Ele deve ser inserido automaticamente na posição correta
+Não pode ir para o final da lista
+📅 2. DIÁRIO (EDIÇÃO + JUSTIFICATIVA + FILTRO)
+✏️ Edição de dias passados:
+Ao clicar em um registro (presença/falta) de dias anteriores:
+Exibir opções:
+Alterar presença/falta
+Justificar falta
+📝 Justificativa:
+Ao selecionar "Justificar":
+Abrir campo de texto livre
+Regra:
+Continua sendo considerado falta
+Porém com status adicional: falta justificada
+🔎 Filtro por data:
+Adicionar campo para:
+Buscar ou selecionar um dia específico
+Atualizar a tabela conforme a data escolhida
+📚 3. ATIVIDADES (MELHORIAS)
+📌 Matérias:
+Adicionar funcionalidade:
+Criar nova matéria
+Lista de matérias deve ser dinâmica
+📌 Listagem de atividades:
+Para cada atividade, exibir:
+Tipo (Para casa / Sala)
+Matéria (como label/tag visível)
+Data
+📌 Dentro da atividade:
+
+Adicionar nova funcionalidade:
+
+✔️ Marcação dupla:
+Para cada aluno permitir:
+Marcar como Entregue
+Marcar como Visto
+📅 Registro de data:
+Cada ação deve salvar:
+Data em que foi marcada (entrega e visto separadamente)
+📊 4. RELATÓRIOS (EXPANSÃO)
+👤 Ao clicar em um aluno:
+
+Atualmente: mostra atividades
+Novo comportamento: mostrar duas seções
+
+📚 A) Relatório de Atividades:
+Agrupar por:
+Matéria (com dropdown/expandível)
+Ordenação:
+Cronológica
+Exibir:
+Total de atividades
+Atividades entregues
+Vistos realizados
+
+Formato:
+
+Atividades recebidas / vistos / total de atividades
+Ex: 6 / 5 / 8
+📅 B) Relatório de Presença:
+Mesmo padrão visual do relatório de atividades
+Exibir:
+Presenças
+Faltas
+Faltas justificadas
+🧠 Regras gerais
+Não quebrar funcionalidades existentes
+Manter design atual
+Garantir compatibilidade mobile
+Priorizar simplicidade de uso
+Feedback visual claro para todas ações
+⚠️ Direto ao ponto (importante)
+
+Esse tipo de ajuste costuma quebrar sistema se for mal implementado, principalmente:
+
+Ordenação automática (pode bugar render)
+Marcação dupla (entrega + visto)
+Relatórios agregados
+
+👉 Se a IA for gerar código, você pode complementar com:
+
+“Refatore de forma incremental e segura, evitando regressões nas funcionalidades existentes.”
