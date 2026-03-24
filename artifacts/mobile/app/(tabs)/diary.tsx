@@ -85,9 +85,15 @@ export default function DiaryScreen() {
 
   const handleCellPress = (studentId: string, studentName: string, date: string) => {
     const status = getCellStatus(studentId, date);
+    const rec = getRecord(studentId, date);
     setEditTarget({ studentId, studentName, date, status });
-    setJustifyMode(false);
-    setJustifyText('');
+    if (status === 'justified') {
+      setJustifyMode(true);
+      setJustifyText(rec?.justification ?? '');
+    } else {
+      setJustifyMode(false);
+      setJustifyText('');
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
@@ -276,24 +282,37 @@ export default function DiaryScreen() {
                   <Ionicons name="close-circle" size={20} color={Colors.danger} />
                   <Text style={[styles.editOptionText, { color: Colors.danger }]}>Marcar Falta</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.editOption, styles.editJustify]} onPress={() => setJustifyMode(true)} activeOpacity={0.85}>
+                <TouchableOpacity
+                  style={[styles.editOption, styles.editJustify]}
+                  onPress={() => {
+                    const rec = getRecord(editTarget!.studentId, editTarget!.date);
+                    setJustifyText(rec?.justification ?? '');
+                    setJustifyMode(true);
+                  }}
+                  activeOpacity={0.85}
+                >
                   <Ionicons name="document-text-outline" size={20} color={Colors.warning} />
-                  <Text style={[styles.editOptionText, { color: Colors.warning }]}>Justificar Falta</Text>
+                  <Text style={[styles.editOptionText, { color: Colors.warning }]}>
+                    {editTarget?.status === 'justified' ? 'Editar justificativa' : 'Justificar Falta'}
+                  </Text>
                 </TouchableOpacity>
               </>
             ) : (
               <>
-                <Text style={styles.justifyLabel}>Motivo da justificativa</Text>
-                <TextInput
-                  style={styles.justifyInput}
-                  placeholder="Descreva o motivo..."
-                  placeholderTextColor={Colors.textTertiary}
-                  value={justifyText}
-                  onChangeText={setJustifyText}
-                  multiline
-                  numberOfLines={3}
-                  autoFocus
-                />
+                <Text style={styles.justifyLabel}>
+                  {editTarget?.status === 'justified' ? 'Editar justificativa' : 'Motivo da justificativa'}
+                </Text>
+                <ScrollView style={{ maxHeight: 150 }} keyboardShouldPersistTaps="handled">
+                  <TextInput
+                    style={[styles.justifyInput, { minHeight: 88 }]}
+                    placeholder="Descreva o motivo..."
+                    placeholderTextColor={Colors.textTertiary}
+                    value={justifyText}
+                    onChangeText={setJustifyText}
+                    multiline
+                    autoFocus
+                  />
+                </ScrollView>
                 <View style={styles.justifyButtons}>
                   <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setJustifyMode(false)} activeOpacity={0.8}>
                     <Text style={styles.modalCancelText}>Voltar</Text>

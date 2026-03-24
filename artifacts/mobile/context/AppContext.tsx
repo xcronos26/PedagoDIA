@@ -46,6 +46,7 @@ interface AppContextValue {
   loadData: () => Promise<void>;
   addStudent: (name: string) => Promise<void>;
   removeStudent: (id: string) => Promise<void>;
+  editStudent: (id: string, newName: string) => Promise<void>;
   toggleAttendance: (studentId: string, date: string) => Promise<void>;
   justifyAbsence: (studentId: string, date: string, justification: string) => Promise<void>;
   setAttendanceRecord: (studentId: string, date: string, present: boolean) => Promise<void>;
@@ -151,6 +152,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await saveAttendance(attendance.filter(a => a.studentId !== id));
     await saveDeliveries(deliveries.filter(d => d.studentId !== id));
   }, [students, attendance, deliveries]);
+
+  const editStudent = useCallback(async (id: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    const updated = students
+      .map(s => s.id === id ? { ...s, name: trimmed } : s)
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }));
+    await saveStudents(updated);
+  }, [students]);
 
   const toggleAttendance = useCallback(async (studentId: string, date: string) => {
     const existing = attendance.find(a => a.studentId === studentId && a.date === date);
@@ -286,6 +296,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       loadData,
       addStudent,
       removeStudent,
+      editStudent,
       toggleAttendance,
       justifyAbsence,
       setAttendanceRecord,

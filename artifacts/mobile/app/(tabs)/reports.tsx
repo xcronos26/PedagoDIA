@@ -7,11 +7,14 @@ import {
   TouchableOpacity,
   Platform,
   ScrollView,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/colors';
-import { useApp, Student, Activity } from '@/context/AppContext';
+import { useApp, Student, Activity, AttendanceRecord } from '@/context/AppContext';
 
 function getLast30Days() {
   const days: string[] = [];
@@ -123,12 +126,16 @@ function SubjectGroupRow({ group, expanded, onToggle, deliveries }: {
   );
 }
 
+type JustificationModal = { rec: AttendanceRecord; date: string; mode: 'view' | 'edit' } | null;
+
 export default function ReportsScreen() {
   const insets = useSafeAreaInsets();
-  const { students, activities, attendance, getDeliveriesForStudent } = useApp();
+  const { students, activities, attendance, getDeliveriesForStudent, justifyAbsence } = useApp();
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<'activities' | 'attendance'>('activities');
+  const [justModal, setJustModal] = useState<JustificationModal>(null);
+  const [editJustText, setEditJustText] = useState('');
 
   const topPadding = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPadding = Platform.OS === 'web' ? 34 : 0;
@@ -276,10 +283,22 @@ export default function ReportsScreen() {
             }).map(day => {
               const rec = attendance.find(a => a.studentId === selectedStudent.id && a.date === day)!;
               const [y, m, d] = day.split('-');
+              const isJustified = rec.justified;
               return (
-                <View key={day} style={[styles.attendanceRow, rec.justified ? styles.attendanceJustified : styles.attendanceAbsent]}>
-                  <View style={[styles.attendanceDot, rec.justified ? { backgroundColor: Colors.warningLight } : { backgroundColor: Colors.dangerLight }]}>
-                    <Ionicons name={rec.justified ? 'alert' : 'close'} size={16} color={rec.justified ? Colors.warning : Colors.danger} />
+                <TouchableOpacity
+                  key={day}
+                  style={[styles.attendanceRow, isJustified ? styles.attendanceJustified : styles.attendanceAbsent]}
+                  onPress={() => {
+                    if (isJustified) {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setJustModal({ rec, date: day, mode: 'view' });
+                      setEditJustText(rec.justification ?? '');
+                    }
+                  }}
+                  activeOpacity={isJustified ? 0.75 : 1}
+                >
+                  <View style={[styles.attendanceDot, { backgroundColor: isJustified ? Colors.warningLight : Colors.dangerLight }]}>
+                    <Ionicons name={isJustified ? 'alert' : 'close'} size={16} color={isJustified ? Colors.warning : Colors.danger} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.attendanceDate}>{d}/{m}/{y}</Text>
@@ -287,12 +306,15 @@ export default function ReportsScreen() {
                       <Text style={styles.attendanceJustText} numberOfLines={2}>{rec.justification}</Text>
                     ) : null}
                   </View>
-                  <View style={[styles.smallBadge, rec.justified ? { backgroundColor: Colors.warningLight } : { backgroundColor: Colors.dangerLight }]}>
-                    <Text style={[styles.smallBadgeText, { color: rec.justified ? Colors.warning : Colors.danger }]}>
-                      {rec.justified ? 'Justificada' : 'Falta'}
-                    </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={[styles.smallBadge, { backgroundColor: isJustified ? Colors.warningLight : Colors.dangerLight }]}>
+                      <Text style={[styles.smallBadgeText, { color: isJustified ? Colors.warning : Colors.danger }]}>
+                        {isJustified ? 'Justificada' : 'Falta'}
+                      </Text>
+                    </View>
+                    {isJustified && <Feather name="edit-2" size={14} color={Colors.warning} />}
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })}
             {attendanceStats.absences === 0 && attendanceStats.justified === 0 && (
@@ -306,6 +328,82 @@ export default function ReportsScreen() {
             )}
           </ScrollView>
         )}
+
+      {/* Justification Full-View / Edit Modal */}
+      <Modal visible={!!justModal} transparent animationType="slide">
+        <TouchableOpacity style={modalStyles.overlay} activeOpacity={1} onPress={() => setJustModal(null)}>
+          <View style={[modalStyles.card, { paddingBottom: insets.bottom + 16 }]} onStartShouldSetResponder={() => true}>
+            <View style={modalStyles.handle} />
+            {justModal?.mode === 'view' ? (
+              <>
+                <View style={modalStyles.titleRow}>
+                  <View style={[modalStyles.iconCircle, { backgroundColor: Colors.warningLight }]}>
+                    <Ionicons name="document-text" size={20} color={Colors.warning} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={modalStyles.title}>Justificativa</Text>
+                    <Text style={modalStyles.subtitle}>
+                      {justModal?.date ? (() => { const [y, m, d] = justModal.date.split('-'); return `${d}/${m}/${y}`; })() : ''}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={modalStyles.editBtn}
+                    onPress={() => setJustModal(j => j ? { ...j, mode: 'edit' } : null)}
+                    activeOpacity={0.8}
+                  >
+                    <Feather name="edit-2" size={16} color={Colors.primary} />
+                    <Text style={modalStyles.editBtnText}>Editar</Text>
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={modalStyles.textScroll} showsVerticalScrollIndicator={false}>
+                  <Text style={modalStyles.justText}>
+                    {justModal?.rec.justification || '(sem justificativa)'}
+                  </Text>
+                </ScrollView>
+                <TouchableOpacity style={modalStyles.closeBtn} onPress={() => setJustModal(null)} activeOpacity={0.8}>
+                  <Text style={modalStyles.closeBtnText}>Fechar</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={modalStyles.title}>Editar justificativa</Text>
+                <Text style={modalStyles.subtitle}>
+                  {justModal?.date ? (() => { const [y, m, d] = justModal.date.split('-'); return `${d}/${m}/${y}`; })() : ''}
+                </Text>
+                <ScrollView style={{ maxHeight: 160 }} keyboardShouldPersistTaps="handled">
+                  <TextInput
+                    style={modalStyles.input}
+                    placeholder="Descreva o motivo..."
+                    placeholderTextColor={Colors.textTertiary}
+                    value={editJustText}
+                    onChangeText={setEditJustText}
+                    multiline
+                    autoFocus
+                  />
+                </ScrollView>
+                <View style={modalStyles.buttons}>
+                  <TouchableOpacity style={modalStyles.cancelBtn} onPress={() => setJustModal(j => j ? { ...j, mode: 'view' } : null)} activeOpacity={0.8}>
+                    <Text style={modalStyles.cancelBtnText}>Voltar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[modalStyles.confirmBtn, !editJustText.trim() && modalStyles.btnDisabled]}
+                    onPress={async () => {
+                      if (!justModal || !selectedStudent || !editJustText.trim()) return;
+                      await justifyAbsence(selectedStudent.id, justModal.date, editJustText.trim());
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                      setJustModal(null);
+                    }}
+                    activeOpacity={0.85}
+                    disabled={!editJustText.trim()}
+                  >
+                    <Text style={modalStyles.confirmBtnText}>Salvar</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
       </View>
     );
   }
@@ -450,4 +548,47 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 20, fontFamily: 'Inter_600SemiBold', color: Colors.text, textAlign: 'center' },
   emptySubtitle: { fontSize: 15, fontFamily: 'Inter_400Regular', color: Colors.textSecondary, textAlign: 'center' },
+});
+
+const modalStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  card: {
+    backgroundColor: Colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, gap: 14,
+  },
+  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: 'center', marginBottom: 4 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  iconCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 20, fontFamily: 'Inter_700Bold', color: Colors.text },
+  subtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', color: Colors.textSecondary, marginTop: 2 },
+  editBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
+    backgroundColor: Colors.primaryLight,
+  },
+  editBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: Colors.primary },
+  textScroll: { maxHeight: 200, backgroundColor: Colors.surfaceSecondary, borderRadius: 14, padding: 14 },
+  justText: { fontSize: 15, fontFamily: 'Inter_400Regular', color: Colors.text, lineHeight: 24 },
+  closeBtn: {
+    height: 52, alignItems: 'center', justifyContent: 'center',
+    borderRadius: 14, backgroundColor: Colors.surfaceSecondary,
+  },
+  closeBtnText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: Colors.textSecondary },
+  input: {
+    backgroundColor: Colors.surfaceSecondary, borderRadius: 12, minHeight: 100,
+    paddingHorizontal: 14, paddingTop: 12, fontSize: 15, fontFamily: 'Inter_400Regular',
+    color: Colors.text, borderWidth: 1.5, borderColor: Colors.border, textAlignVertical: 'top',
+  },
+  buttons: { flexDirection: 'row', gap: 12 },
+  cancelBtn: {
+    flex: 1, height: 52, alignItems: 'center', justifyContent: 'center',
+    borderRadius: 14, backgroundColor: Colors.surfaceSecondary,
+  },
+  cancelBtnText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: Colors.textSecondary },
+  confirmBtn: {
+    flex: 1, height: 52, alignItems: 'center', justifyContent: 'center',
+    borderRadius: 14, backgroundColor: Colors.primary,
+  },
+  confirmBtnText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: '#fff' },
+  btnDisabled: { opacity: 0.5 },
 });
