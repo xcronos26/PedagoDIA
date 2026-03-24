@@ -9,6 +9,7 @@ import {
   Modal,
   TextInput,
   Alert,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -20,12 +21,16 @@ type CellStatus = 'present' | 'absent' | 'justified';
 
 function getLast30Days() {
   const days: string[] = [];
-  for (let i = 29; i >= 0; i--) {
+  for (let i = 0; i < 30; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     days.push(d.toISOString().split('T')[0]);
   }
   return days;
+}
+
+function getTodayISO() {
+  return new Date().toISOString().split('T')[0];
 }
 
 function formatDayLabel(dateStr: string) {

@@ -1,0 +1,86 @@
+Aplique as seguintes correções no sistema existente, garantindo compatibilidade com iPhone (iOS) e mantendo o comportamento atual no Android:
+
+📱 1. BUG NO IPHONE (TECLADO COBRINDO CAMPOS)
+❌ Problema:
+
+Ao abrir inputs (campos de texto), o teclado no iPhone está sobrepondo os botões e campos, impedindo a interação.
+
+✅ Correção esperada:
+Garantir que a tela se ajuste automaticamente ao abrir o teclado
+O campo ativo deve ficar sempre visível
+🔧 Implementação:
+Adicionar suporte a:
+
+viewport correto no HTML:
+
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+Usar:
+scrollIntoView() ao focar no input
+Ou comportamento automático de scroll
+Garantir:
+Containers com overflow: auto
+Evitar position: fixed em elementos críticos durante input
+Se for app híbrido (WebView / PWA):
+Ajustar comportamento com keyboard-safe area
+📌 Regra:
+Nenhum campo ou botão pode ficar escondido atrás do teclado no iPhone
+📅 2. DIÁRIO (ORDEM DAS DATAS)
+❌ Problema:
+O “dia de hoje” está aparecendo no final da lista
+Usuário precisa rolar horizontalmente para encontrar
+✅ Correção esperada:
+Ordenar as datas de forma que:
+O dia atual fique visível imediatamente
+Preferencialmente como primeiro item visível
+🔧 Implementação (escolher uma abordagem):
+Opção 1 (RECOMENDADO):
+Ordenar datas em ordem decrescente
+Hoje → ontem → anteriores
+Opção 2:
+Manter ordem crescente, mas:
+Fazer scroll automático até o dia atual ao carregar
+Opção 3 (melhor UX):
+Fixar visualmente o “Hoje” no início da tabela
+📌 Regra:
+O usuário não deve precisar rolar para encontrar o dia atual
+🧠 Regras gerais
+Não quebrar funcionamento atual no Android
+Garantir compatibilidade cross-browser
+Testar especificamente em iPhone (Safari / WebView)
+⚠️ Agora o que você PRECISA entender (sem enrolação)
+📱 Problema do teclado no iPhone
+
+Isso acontece porque:
+
+iOS trata viewport diferente
+position: fixed + teclado = desastre
+altura da tela muda e o app não reage
+
+👉 Se não corrigir direito agora, isso vai aparecer em:
+
+adicionar aluno
+justificativa
+criação de atividade
+📅 Problema do diário
+
+Isso é erro de lógica simples:
+
+provavelmente está ordenando crescente (mais antigo → mais novo)
+
+👉 Só inverter já resolve 80% do problema
+
+🔥 Dica direta (nível produto)
+
+Se quiser deixar isso realmente bom, faz assim:
+
+👉 Diário:
+
+Hoje sempre visível
+Ontem logo ao lado
+Passado depois
+
+👉 E adiciona:
+
+botão “Hoje”
+
+Isso reduz MUITO fricção.
