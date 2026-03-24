@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Caderneta da Professora",
-    "slug": "mobile",
+    "name": "Pedagomente",
+    "slug": "pedagomente",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "pedagomente",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -14,9 +14,12 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.pedagomente.app"
     },
-    "android": {},
+    "android": {
+      "package": "com.pedagomente.app"
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
