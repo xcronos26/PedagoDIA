@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Pedagomente",
-    "slug": "pedagomente",
+    "name": "PedagoDia",
+    "slug": "pedagogia",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "pedagomente",
+    "scheme": "pedagogia",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,10 +15,10 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.pedagomente.app"
+      "bundleIdentifier": "com.pedagogia.app"
     },
     "android": {
-      "package": "com.pedagomente.app"
+      "package": "com.pedagogia.app"
     },
     "web": {
       "favicon": "./assets/images/icon.png"
