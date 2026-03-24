@@ -43,7 +43,7 @@ export default function LoginScreen() {
           <View style={styles.logoCircle}>
             <Ionicons name="school" size={48} color={Colors.primary} />
           </View>
-          <Text style={styles.appName}>PedagoDia</Text>
+          <Text style={styles.appName}>PedagoDIA</Text>
           <Text style={styles.appSubtitle}>Gestão de Turma</Text>
         </View>
 
