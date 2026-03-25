@@ -5,36 +5,18 @@
   },
   "build": {
     "development": {
-      "projectRoot": ".",
       "developmentClient": true,
-      "distribution": "internal",
-      "node": "20",
-      "pnpm": "10",
-      "env": {
-        "EXPO_USE_PNPM": "1"
-      }
+      "distribution": "internal"
     },
     "preview": {
-      "projectRoot": ".",
       "android": {
         "buildType": "apk"
       },
-      "distribution": "internal",
-      "node": "20",
-      "pnpm": "10",
-      "env": {
-        "EXPO_USE_PNPM": "1"
-      }
+      "distribution": "internal"
     },
     "production": {
-      "projectRoot": ".",
       "android": {
         "buildType": "app-bundle"
-      },
-      "node": "20",
-      "pnpm": "10",
-      "env": {
-        "EXPO_USE_PNPM": "1"
       }
     }
   },

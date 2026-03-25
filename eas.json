@@ -5,36 +5,18 @@
   },
   "build": {
     "development": {
-      "projectRoot": "artifacts/mobile",
       "developmentClient": true,
-      "distribution": "internal",
-      "node": "20",
-      "pnpm": "10",
-      "env": {
-        "EXPO_USE_PNPM": "1"
-      }
+      "distribution": "internal"
     },
     "preview": {
-      "projectRoot": "artifacts/mobile",
       "android": {
         "buildType": "apk"
       },
-      "distribution": "internal",
-      "node": "20",
-      "pnpm": "10",
-      "env": {
-        "EXPO_USE_PNPM": "1"
-      }
+      "distribution": "internal"
     },
     "production": {
-      "projectRoot": "artifacts/mobile",
       "android": {
         "buildType": "app-bundle"
-      },
-      "node": "20",
-      "pnpm": "10",
-      "env": {
-        "EXPO_USE_PNPM": "1"
       }
     }
   },
