@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { apiFetch } from '@/utils/api';
+import { useAuth } from '@/context/AuthContext';
 
 export type Student = {
   id: string;
@@ -34,8 +35,6 @@ export type DeliveryRecord = {
   seenAt?: string;
 };
 
-const DEFAULT_SUBJECTS = ['Matemática', 'Português', 'Ciências', 'História', 'Geografia', 'Arte', 'Educação Física', 'Inglês'];
-
 interface AppContextValue {
   students: Student[];
   attendance: AttendanceRecord[];
@@ -63,220 +62,225 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-const STORAGE_KEYS = {
-  STUDENTS: '@caderneta:students',
-  ATTENDANCE: '@caderneta:attendance',
-  ACTIVITIES: '@caderneta:activities',
-  DELIVERIES: '@caderneta:deliveries',
-  SUBJECTS: '@caderneta:subjects',
-};
-
-function generateId() {
-  return Date.now().toString() + Math.random().toString(36).substr(2, 9);
-}
+type ApiStudent = { id: string; name: string; createdAt: string };
+type ApiActivity = { id: string; subject: string; type: string; link?: string; date: string; description: string; createdAt: string };
+type ApiAttendance = { id: string; studentId: string; date: string; present: boolean; justified?: boolean; justification?: string };
+type ApiDelivery = { id: string; activityId: string; studentId: string; delivered: boolean; seen: boolean; deliveredAt?: string; seenAt?: string };
+type ApiSubject = { id: string; name: string };
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const { token } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [deliveries, setDeliveries] = useState<DeliveryRecord[]>([]);
-  const [subjects, setSubjects] = useState<string[]>(DEFAULT_SUBJECTS);
+  const [subjects, setSubjects] = useState<string[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
   const loadData = useCallback(async () => {
+    if (!token) return;
     try {
-      const [studentsJson, attendanceJson, activitiesJson, deliveriesJson, subjectsJson] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEYS.STUDENTS),
-        AsyncStorage.getItem(STORAGE_KEYS.ATTENDANCE),
-        AsyncStorage.getItem(STORAGE_KEYS.ACTIVITIES),
-        AsyncStorage.getItem(STORAGE_KEYS.DELIVERIES),
-        AsyncStorage.getItem(STORAGE_KEYS.SUBJECTS),
+      const [studentsData, activitiesData, attendanceData, deliveriesData, subjectsData] = await Promise.all([
+        apiFetch<ApiStudent[]>('/students', { token }),
+        apiFetch<ApiActivity[]>('/activities', { token }),
+        apiFetch<ApiAttendance[]>('/attendance', { token }),
+        apiFetch<ApiDelivery[]>('/deliveries', { token }),
+        apiFetch<ApiSubject[]>('/subjects', { token }),
       ]);
-      if (studentsJson) setStudents(JSON.parse(studentsJson));
-      if (attendanceJson) {
-        const parsed: AttendanceRecord[] = JSON.parse(attendanceJson);
-        setAttendance(parsed);
-      }
-      if (activitiesJson) setActivities(JSON.parse(activitiesJson));
-      if (deliveriesJson) {
-        const parsed: DeliveryRecord[] = JSON.parse(deliveriesJson);
-        // Migrate old records that don't have seen field
-        setDeliveries(parsed.map(d => ({ seen: false, ...d })));
-      }
-      if (subjectsJson) setSubjects(JSON.parse(subjectsJson));
+
+      const sortedStudents = studentsData.sort((a, b) =>
+        a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })
+      );
+      setStudents(sortedStudents);
+
+      const sortedActivities = activitiesData
+        .map(a => ({ ...a, type: a.type as 'homework' | 'classwork' }))
+        .sort((a, b) => b.date.localeCompare(a.date));
+      setActivities(sortedActivities);
+
+      setAttendance(attendanceData.map(r => ({
+        studentId: r.studentId,
+        date: r.date,
+        present: r.present,
+        justified: r.justified ?? false,
+        justification: r.justification,
+      })));
+
+      setDeliveries(deliveriesData.map(d => ({
+        activityId: d.activityId,
+        studentId: d.studentId,
+        delivered: d.delivered,
+        seen: d.seen,
+        deliveredAt: d.deliveredAt,
+        seenAt: d.seenAt,
+      })));
+
+      setSubjects(subjectsData.map(s => s.name).sort((a, b) => a.localeCompare(b, 'pt-BR')));
     } catch (e) {
-      console.error('Failed to load data', e);
+      console.error('Failed to load data from API', e);
     } finally {
       setIsLoaded(true);
     }
-  }, []);
+  }, [token]);
 
-  const saveStudents = async (data: Student[]) => {
-    await AsyncStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(data));
-    setStudents(data);
-  };
-
-  const saveAttendance = async (data: AttendanceRecord[]) => {
-    await AsyncStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(data));
-    setAttendance(data);
-  };
-
-  const saveActivities = async (data: Activity[]) => {
-    await AsyncStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(data));
-    setActivities(data);
-  };
-
-  const saveDeliveries = async (data: DeliveryRecord[]) => {
-    await AsyncStorage.setItem(STORAGE_KEYS.DELIVERIES, JSON.stringify(data));
-    setDeliveries(data);
-  };
-
-  const saveSubjects = async (data: string[]) => {
-    await AsyncStorage.setItem(STORAGE_KEYS.SUBJECTS, JSON.stringify(data));
-    setSubjects(data);
-  };
+  useEffect(() => {
+    if (token) {
+      setIsLoaded(false);
+      loadData();
+    } else {
+      setStudents([]);
+      setAttendance([]);
+      setActivities([]);
+      setDeliveries([]);
+      setSubjects([]);
+    }
+  }, [token]);
 
   const addStudent = useCallback(async (name: string) => {
-    const newStudent: Student = {
-      id: generateId(),
-      name: name.trim(),
-      createdAt: new Date().toISOString(),
-    };
-    const updated = [...students, newStudent].sort((a, b) =>
-      a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })
+    if (!token) return;
+    const student = await apiFetch<ApiStudent>('/students', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+      token,
+    });
+    setStudents(prev =>
+      [...prev, student].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }))
     );
-    await saveStudents(updated);
-  }, [students]);
+  }, [token]);
 
   const removeStudent = useCallback(async (id: string) => {
-    await saveStudents(students.filter(s => s.id !== id));
-    await saveAttendance(attendance.filter(a => a.studentId !== id));
-    await saveDeliveries(deliveries.filter(d => d.studentId !== id));
-  }, [students, attendance, deliveries]);
+    if (!token) return;
+    await apiFetch(`/students/${id}`, { method: 'DELETE', token });
+    setStudents(prev => prev.filter(s => s.id !== id));
+    setAttendance(prev => prev.filter(a => a.studentId !== id));
+    setDeliveries(prev => prev.filter(d => d.studentId !== id));
+  }, [token]);
 
   const editStudent = useCallback(async (id: string, newName: string) => {
     const trimmed = newName.trim();
-    if (!trimmed) return;
-    const updated = students
-      .map(s => s.id === id ? { ...s, name: trimmed } : s)
-      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }));
-    await saveStudents(updated);
-  }, [students]);
+    if (!trimmed || !token) return;
+    const student = await apiFetch<ApiStudent>(`/students/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name: trimmed }),
+      token,
+    });
+    setStudents(prev =>
+      prev
+        .map(s => s.id === id ? { ...s, name: student.name } : s)
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }))
+    );
+  }, [token]);
 
   const toggleAttendance = useCallback(async (studentId: string, date: string) => {
+    if (!token) return;
     const existing = attendance.find(a => a.studentId === studentId && a.date === date);
-    let updated: AttendanceRecord[];
-    if (existing) {
-      updated = attendance.map(a =>
-        a.studentId === studentId && a.date === date
-          ? { ...a, present: !a.present, justified: false, justification: undefined }
-          : a
-      );
-    } else {
-      updated = [...attendance, { studentId, date, present: false, justified: false }];
-    }
-    await saveAttendance(updated);
-  }, [attendance]);
+    const present = existing ? !existing.present : false;
+    const record = await apiFetch<ApiAttendance>('/attendance', {
+      method: 'POST',
+      body: JSON.stringify({ studentId, date, present }),
+      token,
+    });
+    setAttendance(prev => {
+      const filtered = prev.filter(a => !(a.studentId === studentId && a.date === date));
+      return [...filtered, { studentId: record.studentId, date: record.date, present: record.present, justified: record.justified ?? false, justification: record.justification }];
+    });
+  }, [token, attendance]);
 
   const setAttendanceRecord = useCallback(async (studentId: string, date: string, present: boolean) => {
-    const existing = attendance.find(a => a.studentId === studentId && a.date === date);
-    let updated: AttendanceRecord[];
-    if (existing) {
-      updated = attendance.map(a =>
-        a.studentId === studentId && a.date === date
-          ? { ...a, present, justified: false, justification: undefined }
-          : a
-      );
-    } else {
-      updated = [...attendance, { studentId, date, present, justified: false }];
-    }
-    await saveAttendance(updated);
-  }, [attendance]);
+    if (!token) return;
+    const record = await apiFetch<ApiAttendance>('/attendance', {
+      method: 'POST',
+      body: JSON.stringify({ studentId, date, present }),
+      token,
+    });
+    setAttendance(prev => {
+      const filtered = prev.filter(a => !(a.studentId === studentId && a.date === date));
+      return [...filtered, { studentId: record.studentId, date: record.date, present: record.present, justified: record.justified ?? false, justification: record.justification }];
+    });
+  }, [token]);
 
   const justifyAbsence = useCallback(async (studentId: string, date: string, justification: string) => {
-    const existing = attendance.find(a => a.studentId === studentId && a.date === date);
-    let updated: AttendanceRecord[];
-    if (existing) {
-      updated = attendance.map(a =>
-        a.studentId === studentId && a.date === date
-          ? { ...a, present: false, justified: true, justification }
-          : a
-      );
-    } else {
-      updated = [...attendance, { studentId, date, present: false, justified: true, justification }];
-    }
-    await saveAttendance(updated);
-  }, [attendance]);
+    if (!token) return;
+    const record = await apiFetch<ApiAttendance>('/attendance/justify', {
+      method: 'POST',
+      body: JSON.stringify({ studentId, date, justification }),
+      token,
+    });
+    setAttendance(prev => {
+      const filtered = prev.filter(a => !(a.studentId === studentId && a.date === date));
+      return [...filtered, { studentId: record.studentId, date: record.date, present: record.present, justified: record.justified ?? true, justification: record.justification }];
+    });
+  }, [token]);
 
   const getAttendanceForDate = useCallback((date: string) => {
     return attendance.filter(a => a.date === date);
   }, [attendance]);
 
   const addActivity = useCallback(async (activity: Omit<Activity, 'id' | 'createdAt'>) => {
-    const newActivity: Activity = {
-      ...activity,
-      id: generateId(),
-      createdAt: new Date().toISOString(),
-    };
-    const updated = [...activities, newActivity].sort((a, b) => b.date.localeCompare(a.date));
-    await saveActivities(updated);
-  }, [activities]);
+    if (!token) return;
+    const created = await apiFetch<ApiActivity>('/activities', {
+      method: 'POST',
+      body: JSON.stringify(activity),
+      token,
+    });
+    setActivities(prev =>
+      [...prev, { ...created, type: created.type as 'homework' | 'classwork' }].sort((a, b) => b.date.localeCompare(a.date))
+    );
+  }, [token]);
 
   const updateActivity = useCallback(async (id: string, updates: Partial<Omit<Activity, 'id' | 'createdAt'>>) => {
-    const updated = activities
-      .map(a => a.id === id ? { ...a, ...updates } : a)
-      .sort((a, b) => b.date.localeCompare(a.date));
-    await saveActivities(updated);
-  }, [activities]);
+    if (!token) return;
+    const existing = activities.find(a => a.id === id);
+    if (!existing) return;
+    const merged = { ...existing, ...updates };
+    const updated = await apiFetch<ApiActivity>(`/activities/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(merged),
+      token,
+    });
+    setActivities(prev =>
+      prev
+        .map(a => a.id === id ? { ...updated, type: updated.type as 'homework' | 'classwork' } : a)
+        .sort((a, b) => b.date.localeCompare(a.date))
+    );
+  }, [token, activities]);
 
   const removeActivity = useCallback(async (id: string) => {
-    await saveActivities(activities.filter(a => a.id !== id));
-    await saveDeliveries(deliveries.filter(d => d.activityId !== id));
-  }, [activities, deliveries]);
+    if (!token) return;
+    await apiFetch(`/activities/${id}`, { method: 'DELETE', token });
+    setActivities(prev => prev.filter(a => a.id !== id));
+    setDeliveries(prev => prev.filter(d => d.activityId !== id));
+  }, [token]);
 
   const toggleDelivery = useCallback(async (activityId: string, studentId: string) => {
+    if (!token) return;
     const existing = deliveries.find(d => d.activityId === activityId && d.studentId === studentId);
-    let updated: DeliveryRecord[];
-    if (existing) {
-      const nowDelivered = !existing.delivered;
-      updated = deliveries.map(d =>
-        d.activityId === activityId && d.studentId === studentId
-          ? { ...d, delivered: nowDelivered, deliveredAt: nowDelivered ? new Date().toISOString() : undefined }
-          : d
-      );
-    } else {
-      updated = [...deliveries, {
-        activityId,
-        studentId,
-        delivered: true,
-        seen: false,
-        deliveredAt: new Date().toISOString(),
-      }];
-    }
-    await saveDeliveries(updated);
-  }, [deliveries]);
+    const nowDelivered = existing ? !existing.delivered : true;
+    const record = await apiFetch<ApiDelivery>('/deliveries', {
+      method: 'POST',
+      body: JSON.stringify({ activityId, studentId, delivered: nowDelivered, seen: existing?.seen ?? false }),
+      token,
+    });
+    setDeliveries(prev => {
+      const filtered = prev.filter(d => !(d.activityId === activityId && d.studentId === studentId));
+      return [...filtered, { activityId: record.activityId, studentId: record.studentId, delivered: record.delivered, seen: record.seen, deliveredAt: record.deliveredAt, seenAt: record.seenAt }];
+    });
+  }, [token, deliveries]);
 
   const toggleSeen = useCallback(async (activityId: string, studentId: string) => {
+    if (!token) return;
     const existing = deliveries.find(d => d.activityId === activityId && d.studentId === studentId);
-    let updated: DeliveryRecord[];
-    if (existing) {
-      const nowSeen = !existing.seen;
-      updated = deliveries.map(d =>
-        d.activityId === activityId && d.studentId === studentId
-          ? { ...d, seen: nowSeen, seenAt: nowSeen ? new Date().toISOString() : undefined }
-          : d
-      );
-    } else {
-      updated = [...deliveries, {
-        activityId,
-        studentId,
-        delivered: false,
-        seen: true,
-        seenAt: new Date().toISOString(),
-      }];
-    }
-    await saveDeliveries(updated);
-  }, [deliveries]);
+    const nowSeen = existing ? !existing.seen : true;
+    const record = await apiFetch<ApiDelivery>('/deliveries', {
+      method: 'POST',
+      body: JSON.stringify({ activityId, studentId, delivered: existing?.delivered ?? false, seen: nowSeen }),
+      token,
+    });
+    setDeliveries(prev => {
+      const filtered = prev.filter(d => !(d.activityId === activityId && d.studentId === studentId));
+      return [...filtered, { activityId: record.activityId, studentId: record.studentId, delivered: record.delivered, seen: record.seen, deliveredAt: record.deliveredAt, seenAt: record.seenAt }];
+    });
+  }, [token, deliveries]);
 
   const getDeliveriesForActivity = useCallback((activityId: string) => {
     return deliveries.filter(d => d.activityId === activityId);
@@ -288,10 +292,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addSubject = useCallback(async (subject: string) => {
     const trimmed = subject.trim();
-    if (!trimmed || subjects.includes(trimmed)) return;
-    const updated = [...subjects, trimmed].sort((a, b) => a.localeCompare(b, 'pt-BR'));
-    await saveSubjects(updated);
-  }, [subjects]);
+    if (!trimmed || subjects.includes(trimmed) || !token) return;
+    await apiFetch('/subjects', {
+      method: 'POST',
+      body: JSON.stringify({ name: trimmed }),
+      token,
+    });
+    setSubjects(prev => [...prev, trimmed].sort((a, b) => a.localeCompare(b, 'pt-BR')));
+  }, [token, subjects]);
 
   return (
     <AppContext.Provider value={{

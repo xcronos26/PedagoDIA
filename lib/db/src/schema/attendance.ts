@@ -4,9 +4,12 @@ import { z } from "zod/v4";
 
 export const attendanceTable = pgTable("attendance", {
   id: text("id").primaryKey(),
+  teacherId: text("teacher_id"),
   studentId: text("student_id").notNull(),
   date: text("date").notNull(),
   present: boolean("present").notNull().default(true),
+  justified: boolean("justified").default(false),
+  justification: text("justification"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

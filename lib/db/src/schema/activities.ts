@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 
 export const activitiesTable = pgTable("activities", {
   id: text("id").primaryKey(),
+  teacherId: text("teacher_id"),
   subject: text("subject").notNull(),
   type: text("type").notNull(),
   link: text("link"),

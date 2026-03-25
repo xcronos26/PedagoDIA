@@ -1,70 +1,101 @@
 import { Router, type IRouter } from "express";
-import { db } from "@workspace/db";
-import { deliveriesTable } from "@workspace/db";
+import { db, deliveriesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { requireAuth } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
-router.get("/deliveries", async (req, res) => {
+function generateId() {
+  return Date.now().toString() + Math.random().toString(36).substring(2, 9);
+}
+
+function mapDelivery(r: typeof deliveriesTable.$inferSelect) {
+  return {
+    id: r.id,
+    activityId: r.activityId,
+    studentId: r.studentId,
+    delivered: r.delivered,
+    seen: r.seen,
+    deliveredAt: r.deliveredAt?.toISOString() ?? undefined,
+    seenAt: r.seenAt?.toISOString() ?? undefined,
+    createdAt: r.createdAt.toISOString(),
+  };
+}
+
+router.get("/deliveries", requireAuth, async (req, res) => {
   try {
+    const teacherId = req.teacherId!;
     const { activityId, studentId } = req.query;
-    let query = db.select().from(deliveriesTable);
     let records;
     if (activityId && typeof activityId === "string") {
-      records = await db.select().from(deliveriesTable).where(eq(deliveriesTable.activityId, activityId));
+      records = await db.select().from(deliveriesTable)
+        .where(and(eq(deliveriesTable.teacherId, teacherId), eq(deliveriesTable.activityId, activityId)));
     } else if (studentId && typeof studentId === "string") {
-      records = await db.select().from(deliveriesTable).where(eq(deliveriesTable.studentId, studentId));
+      records = await db.select().from(deliveriesTable)
+        .where(and(eq(deliveriesTable.teacherId, teacherId), eq(deliveriesTable.studentId, studentId)));
     } else {
-      records = await db.select().from(deliveriesTable);
+      records = await db.select().from(deliveriesTable)
+        .where(eq(deliveriesTable.teacherId, teacherId));
     }
-    res.json(records.map(r => ({
-      id: r.id,
-      activityId: r.activityId,
-      studentId: r.studentId,
-      delivered: r.delivered,
-      createdAt: r.createdAt.toISOString(),
-    })));
+    res.json(records.map(mapDelivery));
   } catch (err) {
     req.log.error({ err }, "Error listing deliveries");
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "Erro interno do servidor" });
   }
 });
 
-router.post("/deliveries", async (req, res) => {
+router.post("/deliveries", requireAuth, async (req, res) => {
   try {
-    const { activityId, studentId, delivered } = req.body;
-    if (!activityId || !studentId || delivered === undefined) {
-      res.status(400).json({ error: "activityId, studentId, and delivered are required" });
+    const teacherId = req.teacherId!;
+    const { activityId, studentId, delivered, seen } = req.body;
+    if (!activityId || !studentId) {
+      res.status(400).json({ error: "activityId e studentId são obrigatórios" });
       return;
     }
     const existing = await db.select().from(deliveriesTable)
-      .where(and(eq(deliveriesTable.activityId, activityId), eq(deliveriesTable.studentId, studentId)));
+      .where(and(
+        eq(deliveriesTable.teacherId, teacherId),
+        eq(deliveriesTable.activityId, activityId),
+        eq(deliveriesTable.studentId, studentId),
+      ));
 
+    const now = new Date();
     let record;
     if (existing.length > 0) {
+      const prev = existing[0];
+      const updates: Partial<typeof deliveriesTable.$inferInsert> = {};
+      if (delivered !== undefined) {
+        updates.delivered = delivered;
+        updates.deliveredAt = delivered ? (prev.deliveredAt ?? now) : null;
+      }
+      if (seen !== undefined) {
+        updates.seen = seen;
+        updates.seenAt = seen ? (prev.seenAt ?? now) : null;
+      }
       [record] = await db.update(deliveriesTable)
-        .set({ delivered })
-        .where(and(eq(deliveriesTable.activityId, activityId), eq(deliveriesTable.studentId, studentId)))
+        .set(updates)
+        .where(and(
+          eq(deliveriesTable.teacherId, teacherId),
+          eq(deliveriesTable.activityId, activityId),
+          eq(deliveriesTable.studentId, studentId),
+        ))
         .returning();
     } else {
-      const id = Date.now().toString() + Math.random().toString(36).substring(2, 9);
       [record] = await db.insert(deliveriesTable).values({
-        id,
+        id: generateId(),
+        teacherId,
         activityId,
         studentId,
-        delivered,
+        delivered: delivered ?? false,
+        seen: seen ?? false,
+        deliveredAt: delivered ? now : null,
+        seenAt: seen ? now : null,
       }).returning();
     }
-    res.json({
-      id: record.id,
-      activityId: record.activityId,
-      studentId: record.studentId,
-      delivered: record.delivered,
-      createdAt: record.createdAt.toISOString(),
-    });
+    res.json(mapDelivery(record));
   } catch (err) {
     req.log.error({ err }, "Error upserting delivery");
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "Erro interno do servidor" });
   }
 });
 

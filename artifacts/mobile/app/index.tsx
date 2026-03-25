@@ -1,194 +1,32 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  Image,
-  ActivityIndicator,
-} from 'react-native';
-import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import React from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { Redirect } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
 import { Colors } from '@/constants/colors';
-import { useApp } from '@/context/AppContext';
 
-export default function LoginScreen() {
-  const insets = useSafeAreaInsets();
-  const { loadData } = useApp();
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+export default function Index() {
+  const { isAuthenticated, isLoading } = useAuth();
 
-  const handleLogin = async () => {
-    if (password === '1234' || password === '') {
-      setLoading(true);
-      await loadData();
-      router.replace('/(tabs)');
-    } else {
-      setError('Senha incorreta. Use 1234');
-    }
-  };
-
-  return (
-    <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <View style={styles.content}>
-        <View style={styles.logoContainer}>
-          <Image
-            source={require('@/assets/images/logo.png')}
-            style={styles.logoImage}
-            resizeMode="contain"
-          />
-          <Text style={styles.appName}>PedagoDIA</Text>
-          <Text style={styles.appSubtitle}>Gestão de Turma</Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.label}>Senha de acesso</Text>
-          <View style={[styles.inputContainer, error ? styles.inputError : null]}>
-            <Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Digite sua senha"
-              placeholderTextColor={Colors.textTertiary}
-              secureTextEntry
-              value={password}
-              onChangeText={(t) => { setPassword(t); setError(''); }}
-              onSubmitEditing={handleLogin}
-              returnKeyType="done"
-            />
-          </View>
-          {!!error && (
-            <Text style={styles.errorText}>{error}</Text>
-          )}
-          <Text style={styles.hint}>Senha padrão: 1234 (ou deixe em branco)</Text>
-
-          <TouchableOpacity
-            style={styles.loginButton}
-            onPress={handleLogin}
-            activeOpacity={0.85}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Text style={styles.loginButtonText}>Entrar</Text>
-                <Ionicons name="arrow-forward" size={20} color="#fff" />
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color={Colors.primary} />
       </View>
-    </KeyboardAvoidingView>
-  );
+    );
+  }
+
+  if (isAuthenticated) {
+    return <Redirect href="/(tabs)" />;
+  }
+
+  return <Redirect href="/(auth)/login" />;
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: Colors.background,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    gap: 32,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  logoImage: {
-    width: 140,
-    height: 140,
-    marginBottom: 4,
-    borderRadius: 24,
-  },
-  appName: {
-    fontSize: 32,
-    fontFamily: 'Inter_700Bold',
-    color: Colors.text,
-    letterSpacing: -0.5,
-  },
-  appSubtitle: {
-    fontSize: 18,
-    fontFamily: 'Inter_400Regular',
-    color: Colors.textSecondary,
-  },
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
-    padding: 24,
-    gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  label: {
-    fontSize: 14,
-    fontFamily: 'Inter_600SemiBold',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surfaceSecondary,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-  },
-  inputError: {
-    borderColor: Colors.danger,
-  },
-  inputIcon: {
-    paddingLeft: 14,
-  },
-  input: {
-    flex: 1,
-    height: 52,
-    paddingHorizontal: 12,
-    fontSize: 16,
-    fontFamily: 'Inter_400Regular',
-    color: Colors.text,
-  },
-  errorText: {
-    fontSize: 13,
-    fontFamily: 'Inter_500Medium',
-    color: Colors.danger,
-  },
-  hint: {
-    fontSize: 13,
-    fontFamily: 'Inter_400Regular',
-    color: Colors.textTertiary,
-  },
-  loginButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: 14,
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 8,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  loginButtonText: {
-    fontSize: 17,
-    fontFamily: 'Inter_600SemiBold',
-    color: '#fff',
   },
 });

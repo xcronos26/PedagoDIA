@@ -14,8 +14,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { router } from 'expo-router';
 import { Colors } from '@/constants/colors';
 import { useApp, Student } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 
 function formatDate(date: Date) {
   return date.toISOString().split('T')[0];
@@ -92,6 +94,7 @@ function StudentCard({ student, isAbsent, onToggle, onLongPress }: {
 export default function AttendanceScreen() {
   const insets = useSafeAreaInsets();
   const { students, addStudent, removeStudent, editStudent, toggleAttendance, getAttendanceForDate } = useApp();
+  const { teacher, logout } = useAuth();
   const [selectedDate] = useState(formatDate(new Date()));
   const [showAddModal, setShowAddModal] = useState(false);
   const [newStudentName, setNewStudentName] = useState('');
@@ -148,13 +151,26 @@ export default function AttendanceScreen() {
   return (
     <View style={[styles.container, { paddingTop: topPadding }]}>
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>Chamada</Text>
           <Text style={styles.headerDate}>{formatDateDisplay(selectedDate)}</Text>
+          {teacher && <Text style={styles.headerTeacher} numberOfLines={1}>{teacher.name}</Text>}
         </View>
-        <TouchableOpacity style={styles.addButton} onPress={() => setShowAddModal(true)} activeOpacity={0.8}>
-          <Ionicons name="add" size={24} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={async () => {
+              await logout();
+              router.replace('/(auth)/login');
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="log-out-outline" size={20} color={Colors.textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.addButton} onPress={() => setShowAddModal(true)} activeOpacity={0.8}>
+            <Ionicons name="add" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {students.length > 0 && (
@@ -298,8 +314,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 20, paddingVertical: 16,
   },
+  headerLeft: { flex: 1 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', color: Colors.text, letterSpacing: -0.5 },
   headerDate: { fontSize: 14, fontFamily: 'Inter_400Regular', color: Colors.textSecondary, marginTop: 2 },
+  headerTeacher: { fontSize: 12, fontFamily: 'Inter_500Medium', color: Colors.textTertiary, marginTop: 1 },
+  logoutButton: {
+    width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.surface,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.border,
+  },
   addButton: {
     width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary,
     alignItems: 'center', justifyContent: 'center',

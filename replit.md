@@ -48,6 +48,27 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 - `pnpm run build` — runs `typecheck` first, then recursively runs `build` in all packages that define it
 - `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly` using project references
 
+## PedagoDIA App
+
+### Mobile App (`artifacts/mobile`)
+Expo React Native app (PedagoDIA) for classroom management. Features multi-teacher authentication with isolated data per teacher.
+
+- **Auth**: JWT-based login/register via API; token stored in AsyncStorage
+- **Screens**: Login (`(auth)/login`), Register (`(auth)/register`), Chamada (index), Diário, Atividades, Relatórios
+- **Context**: `AuthContext` (auth state + token), `AppContext` (data fetching via API)
+- **API client**: `utils/api.ts` — uses `EXPO_PUBLIC_DOMAIN` env var for base URL
+- **Routing**: Unauthenticated → `/(auth)/login`, Authenticated → `/(tabs)`
+- **Logout**: Button in Chamada screen header
+- **Data isolation**: All data filtered by `teacherId` from JWT
+
+### API Server (`artifacts/api-server`)
+Express 5 API with JWT auth. All data routes require Bearer token.
+
+- **Auth routes**: `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`
+- **Protected routes**: `/api/students`, `/api/activities`, `/api/attendance`, `/api/subjects`, `/api/deliveries`
+- **Auth**: `bcryptjs` (password hashing), `jsonwebtoken` (JWT, 30d expiry), `requireAuth` middleware
+- **JWT_SECRET**: Set in shared environment variables
+
 ## Packages
 
 ### `artifacts/api-server` (`@workspace/api-server`)

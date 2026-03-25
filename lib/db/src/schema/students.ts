@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 
 export const studentsTable = pgTable("students", {
   id: text("id").primaryKey(),
+  teacherId: text("teacher_id"),
   name: text("name").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
