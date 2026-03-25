@@ -6,17 +6,26 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "node": "22",
+      "pnpm": "10"
     },
     "preview": {
       "android": {
         "buildType": "apk"
       },
-      "distribution": "internal"
+      "distribution": "internal",
+      "node": "22",
+      "pnpm": "10"
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
+      },
+      "node": "22",
+      "pnpm": "10",
+      "env": {
+        "EXPO_USE_PNPM": "1"
       }
     }
   },
