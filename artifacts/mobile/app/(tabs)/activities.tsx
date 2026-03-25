@@ -13,11 +13,13 @@ import {
   Linking,
   KeyboardAvoidingView,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/colors';
 import { useApp, Activity } from '@/context/AppContext';
+import { getBrasiliaToday, parseISODate, toISO, formatBR } from '@/utils/date';
 
 type ActivityAction = { activity: Activity; mode: 'options' | 'edit' } | null;
 
@@ -92,7 +94,7 @@ const emptyForm = {
   subject: '',
   type: 'homework' as 'homework' | 'classwork',
   link: '',
-  date: new Date().toISOString().split('T')[0],
+  date: getBrasiliaToday(),
   description: '',
 };
 
@@ -112,6 +114,8 @@ export default function ActivitiesScreen() {
 
   const [form, setForm] = useState({ ...emptyForm });
   const [editForm, setEditForm] = useState({ ...emptyForm });
+  const [showAddDatePicker, setShowAddDatePicker] = useState(false);
+  const [showEditDatePicker, setShowEditDatePicker] = useState(false);
 
   const topPadding = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPadding = Platform.OS === 'web' ? 34 : 0;
@@ -370,13 +374,22 @@ export default function ActivitiesScreen() {
               />
 
               <Text style={styles.fieldLabel}>Data</Text>
-              <TextInput
-                style={styles.modalInput}
-                placeholder="AAAA-MM-DD"
-                placeholderTextColor={Colors.textTertiary}
-                value={form.date}
-                onChangeText={t => setForm(f => ({ ...f, date: t }))}
-              />
+              <TouchableOpacity style={styles.dateButton} onPress={() => setShowAddDatePicker(true)} activeOpacity={0.85}>
+                <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
+                <Text style={styles.dateButtonText}>{formatBR(form.date)}</Text>
+              </TouchableOpacity>
+              {showAddDatePicker && (
+                <DateTimePicker
+                  value={parseISODate(form.date)}
+                  mode="date"
+                  display="default"
+                  onChange={(_, date) => {
+                    setShowAddDatePicker(false);
+                    if (date) setForm(f => ({ ...f, date: toISO(date) }));
+                  }}
+                  locale="pt-BR"
+                />
+              )}
 
               <Text style={styles.fieldLabel}>Link (opcional)</Text>
               <TextInput
@@ -394,10 +407,10 @@ export default function ActivitiesScreen() {
                   <Text style={styles.modalCancelText}>Cancelar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.modalConfirmBtn, (!form.description.trim() || !form.date) && styles.btnDisabled]}
+                  style={[styles.modalConfirmBtn, !form.description.trim() && styles.btnDisabled]}
                   onPress={handleAdd}
                   activeOpacity={0.85}
-                  disabled={!form.description.trim() || !form.date}
+                  disabled={!form.description.trim()}
                 >
                   <Text style={styles.modalConfirmText}>Adicionar</Text>
                 </TouchableOpacity>
@@ -498,13 +511,22 @@ export default function ActivitiesScreen() {
               />
 
               <Text style={styles.fieldLabel}>Data</Text>
-              <TextInput
-                style={styles.modalInput}
-                placeholder="AAAA-MM-DD"
-                placeholderTextColor={Colors.textTertiary}
-                value={editForm.date}
-                onChangeText={t => setEditForm(f => ({ ...f, date: t }))}
-              />
+              <TouchableOpacity style={styles.dateButton} onPress={() => setShowEditDatePicker(true)} activeOpacity={0.85}>
+                <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
+                <Text style={styles.dateButtonText}>{formatBR(editForm.date)}</Text>
+              </TouchableOpacity>
+              {showEditDatePicker && (
+                <DateTimePicker
+                  value={parseISODate(editForm.date)}
+                  mode="date"
+                  display="default"
+                  onChange={(_, date) => {
+                    setShowEditDatePicker(false);
+                    if (date) setEditForm(f => ({ ...f, date: toISO(date) }));
+                  }}
+                  locale="pt-BR"
+                />
+              )}
 
               <Text style={styles.fieldLabel}>Link (opcional)</Text>
               <TextInput
@@ -522,10 +544,10 @@ export default function ActivitiesScreen() {
                   <Text style={styles.modalCancelText}>Cancelar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.modalConfirmBtn, (!editForm.description.trim() || !editForm.date) && styles.btnDisabled]}
+                  style={[styles.modalConfirmBtn, !editForm.description.trim() && styles.btnDisabled]}
                   onPress={handleSaveEdit}
                   activeOpacity={0.85}
-                  disabled={!editForm.description.trim() || !editForm.date}
+                  disabled={!editForm.description.trim()}
                 >
                   <Text style={styles.modalConfirmText}>Salvar</Text>
                 </TouchableOpacity>
@@ -776,4 +798,11 @@ const styles = StyleSheet.create({
   deliveryActionDelivered: { backgroundColor: '#F0FDF4', borderColor: Colors.success },
   deliveryActionSeen: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary },
   deliveryActionLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', color: Colors.textTertiary },
+  dateButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: Colors.primaryLight, borderRadius: 14,
+    paddingHorizontal: 16, paddingVertical: 14,
+    borderWidth: 1.5, borderColor: Colors.primary,
+  },
+  dateButtonText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: Colors.primary },
 });

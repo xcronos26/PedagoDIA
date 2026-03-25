@@ -8,69 +8,45 @@ import {
   TouchableOpacity,
   Modal,
   TextInput,
-  Alert,
   KeyboardAvoidingView,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/colors';
 import { useApp, AttendanceRecord } from '@/context/AppContext';
+import {
+  getWeekDays,
+  getBrasiliaToday,
+  getBrasiliaDate,
+  parseISODate,
+  toISO,
+  formatBR,
+  formatDayLabel,
+  formatDayOfWeek,
+} from '@/utils/date';
 
 type CellStatus = 'present' | 'absent' | 'justified';
-
-function getLast30Days() {
-  const days: string[] = [];
-  for (let i = 0; i < 30; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    days.push(d.toISOString().split('T')[0]);
-  }
-  return days;
-}
-
-function getTodayISO() {
-  return new Date().toISOString().split('T')[0];
-}
-
-function formatDayLabel(dateStr: string) {
-  const [, month, day] = dateStr.split('-');
-  return `${day}/${month}`;
-}
-
-function formatDayOfWeek(dateStr: string) {
-  const date = new Date(dateStr + 'T12:00:00');
-  const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-  return days[date.getDay()];
-}
-
-function formatFullDate(dateStr: string) {
-  const [y, m, d] = dateStr.split('-');
-  return `${d}/${m}/${y}`;
-}
-
 type EditTarget = { studentId: string; studentName: string; date: string; status: CellStatus } | null;
 
 export default function DiaryScreen() {
   const insets = useSafeAreaInsets();
-  const { students, attendance, toggleAttendance, setAttendanceRecord, justifyAbsence } = useApp();
+  const { students, attendance, setAttendanceRecord, justifyAbsence, getAttendanceForDate } = useApp();
 
-  const allDays = useMemo(() => getLast30Days(), []);
-  const [filterDate, setFilterDate] = useState('');
-  const [showFilterModal, setShowFilterModal] = useState(false);
-  const [filterInput, setFilterInput] = useState('');
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [editTarget, setEditTarget] = useState<EditTarget>(null);
   const [justifyText, setJustifyText] = useState('');
   const [justifyMode, setJustifyMode] = useState(false);
 
+  const today = getBrasiliaToday();
+  const days = useMemo(() => getWeekDays(weekOffset), [weekOffset]);
+  const weekStart = days[0];
+  const weekEnd = days[4];
+
   const topPadding = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPadding = Platform.OS === 'web' ? 34 : 0;
-
-  const days = useMemo(() => {
-    if (!filterDate) return allDays;
-    if (allDays.includes(filterDate)) return [filterDate];
-    return [filterDate];
-  }, [allDays, filterDate]);
 
   const getRecord = (studentId: string, date: string): AttendanceRecord | undefined =>
     attendance.find(a => a.studentId === studentId && a.date === date);
@@ -82,11 +58,12 @@ export default function DiaryScreen() {
     return rec.present ? 'present' : 'absent';
   };
 
+  // Totals count over ALL attendance records (all weeks)
   const getAbsentCount = (studentId: string) =>
-    allDays.filter(d => getCellStatus(studentId, d) === 'absent').length;
+    attendance.filter(a => a.studentId === studentId && !a.present && !a.justified).length;
 
   const getJustifiedCount = (studentId: string) =>
-    allDays.filter(d => getCellStatus(studentId, d) === 'justified').length;
+    attendance.filter(a => a.studentId === studentId && a.justified).length;
 
   const handleCellPress = (studentId: string, studentName: string, date: string) => {
     const status = getCellStatus(studentId, date);
@@ -122,40 +99,67 @@ export default function DiaryScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  const applyFilter = () => {
-    const parts = filterInput.replace(/\//g, '-').split('-');
-    if (parts.length === 3) {
-      let y = parts[0], m = parts[1], d = parts[2];
-      if (parts[0].length === 2) { y = parts[2]; m = parts[1]; d = parts[0]; }
-      const iso = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-      setFilterDate(iso);
+  const handleDatePickerChange = (_: any, date?: Date) => {
+    setShowDatePicker(false);
+    if (date) {
+      const iso = toISO(date);
+      // Find which week contains this date and navigate to it
+      const todayDate = getBrasiliaDate();
+      const todayDow = todayDate.getDay();
+      const mondayDelta = todayDow === 0 ? -6 : 1 - todayDow;
+      const thisMondayMs = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate() + mondayDelta).getTime();
+      const selectedMondayDow = date.getDay();
+      const selectedMondayDelta = selectedMondayDow === 0 ? -6 : 1 - selectedMondayDow;
+      const selectedMondayMs = new Date(date.getFullYear(), date.getMonth(), date.getDate() + selectedMondayDelta).getTime();
+      const diffWeeks = Math.round((selectedMondayMs - thisMondayMs) / (7 * 24 * 60 * 60 * 1000));
+      setWeekOffset(diffWeeks);
     }
-    setShowFilterModal(false);
   };
 
-  const clearFilter = () => {
-    setFilterDate('');
-    setFilterInput('');
-  };
+  const isCurrentWeek = weekOffset === 0;
 
   return (
     <View style={[styles.container, { paddingTop: topPadding }]}>
+      {/* Header */}
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Diário</Text>
           <Text style={styles.headerSub}>
-            {filterDate ? formatFullDate(filterDate) : 'Últimos 30 dias'}
+            {formatDayLabel(weekStart)} – {formatDayLabel(weekEnd)}
+            {isCurrentWeek ? '  (esta semana)' : ''}
           </Text>
         </View>
-        <TouchableOpacity style={styles.filterBtn} onPress={() => setShowFilterModal(true)} activeOpacity={0.8}>
-          <Feather name="filter" size={18} color={filterDate ? Colors.primary : Colors.textSecondary} />
+        <TouchableOpacity style={styles.navBtn} onPress={() => setWeekOffset(o => o - 1)} activeOpacity={0.8}>
+          <Ionicons name="chevron-back" size={20} color={Colors.text} />
         </TouchableOpacity>
-        {filterDate ? (
-          <TouchableOpacity style={styles.clearBtn} onPress={clearFilter} activeOpacity={0.8}>
-            <Ionicons name="close" size={18} color={Colors.danger} />
+        <TouchableOpacity
+          style={[styles.navBtn, isCurrentWeek && styles.navBtnDisabled]}
+          onPress={() => setWeekOffset(o => o + 1)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="chevron-forward" size={20} color={isCurrentWeek ? Colors.textTertiary : Colors.text} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.calendarBtn} onPress={() => setShowDatePicker(true)} activeOpacity={0.8}>
+          <Ionicons name="calendar-outline" size={20} color={Colors.primary} />
+        </TouchableOpacity>
+        {weekOffset !== 0 && (
+          <TouchableOpacity style={styles.todayBtn} onPress={() => setWeekOffset(0)} activeOpacity={0.8}>
+            <Text style={styles.todayBtnText}>Hoje</Text>
           </TouchableOpacity>
-        ) : null}
+        )}
       </View>
+
+      {/* Date Picker (shown on demand) */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={parseISODate(days[0])}
+          mode="date"
+          display="default"
+          onChange={handleDatePickerChange}
+          maximumDate={parseISODate(today)}
+          locale="pt-BR"
+        />
+      )}
 
       {students.length === 0 ? (
         <View style={styles.emptyState}>
@@ -168,23 +172,29 @@ export default function DiaryScreen() {
       ) : (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tableWrapper}>
           <View>
+            {/* Header row */}
             <View style={styles.headerRow}>
               <View style={styles.nameColumn}>
                 <Text style={styles.columnLabel}>Aluno</Text>
               </View>
-              {days.map(day => (
-                <View key={day} style={styles.dayColumn}>
-                  <Text style={styles.dayOfWeek}>{formatDayOfWeek(day)}</Text>
-                  <Text style={styles.dayLabel}>{formatDayLabel(day)}</Text>
-                </View>
-              ))}
+              {days.map(day => {
+                const isToday = day === today;
+                return (
+                  <View key={day} style={[styles.dayColumn, isToday && styles.todayColumn]}>
+                    <Text style={[styles.dayOfWeek, isToday && styles.todayDayOfWeek]}>{formatDayOfWeek(day)}</Text>
+                    <Text style={[styles.dayLabel, isToday && styles.todayDayLabel]}>{formatDayLabel(day)}</Text>
+                  </View>
+                );
+              })}
               <View style={styles.totalColumn}>
-                <Text style={styles.columnLabel}>F</Text>
+                <Text style={[styles.columnLabel, { color: Colors.danger }]}>F</Text>
               </View>
               <View style={styles.totalColumn}>
                 <Text style={[styles.columnLabel, { color: Colors.warning }]}>FJ</Text>
               </View>
             </View>
+
+            {/* Student rows */}
             <ScrollView
               style={styles.bodyScroll}
               showsVerticalScrollIndicator={false}
@@ -200,12 +210,10 @@ export default function DiaryScreen() {
                   </View>
                   {days.map(day => {
                     const status = getCellStatus(student.id, day);
+                    const isToday = day === today;
                     return (
-                      <View key={day} style={styles.dayColumn}>
-                        <TouchableOpacity
-                          onPress={() => handleCellPress(student.id, student.name, day)}
-                          activeOpacity={0.7}
-                        >
+                      <View key={day} style={[styles.dayColumn, isToday && styles.todayColumn]}>
+                        <TouchableOpacity onPress={() => handleCellPress(student.id, student.name, day)} activeOpacity={0.7}>
                           <View style={[
                             styles.cell,
                             status === 'present' ? styles.cellPresent
@@ -266,109 +274,80 @@ export default function DiaryScreen() {
             </View>
             <Text style={styles.legendText}>Justificada</Text>
           </View>
+          <View style={styles.legendItem}>
+            <Ionicons name="information-circle-outline" size={14} color={Colors.textTertiary} />
+            <Text style={[styles.legendText, { color: Colors.textTertiary }]}>F/FJ = total geral</Text>
+          </View>
         </View>
       )}
 
       {/* Edit Cell Modal */}
       <Modal visible={!!editTarget} transparent animationType="fade">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => { setEditTarget(null); setJustifyMode(false); }}>
-          <View style={[styles.editCard, { paddingBottom: insets.bottom + 16 }]} onStartShouldSetResponder={() => true}>
-            <View style={styles.modalHandle} />
-            <Text style={styles.editTitle}>{editTarget?.studentName}</Text>
-            <Text style={styles.editDate}>{editTarget ? formatFullDate(editTarget.date) : ''}</Text>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => { setEditTarget(null); setJustifyMode(false); }}>
+            <View style={[styles.editCard, { paddingBottom: insets.bottom + 16 }]} onStartShouldSetResponder={() => true}>
+              <View style={styles.modalHandle} />
+              <Text style={styles.editTitle}>{editTarget?.studentName}</Text>
+              <Text style={styles.editDate}>{editTarget ? formatBR(editTarget.date) : ''}</Text>
 
-            {!justifyMode ? (
-              <>
-                <TouchableOpacity style={[styles.editOption, styles.editPresent]} onPress={handleSetPresent} activeOpacity={0.85}>
-                  <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
-                  <Text style={[styles.editOptionText, { color: Colors.success }]}>Marcar Presente</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.editOption, styles.editAbsent]} onPress={handleSetAbsent} activeOpacity={0.85}>
-                  <Ionicons name="close-circle" size={20} color={Colors.danger} />
-                  <Text style={[styles.editOptionText, { color: Colors.danger }]}>Marcar Falta</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.editOption, styles.editJustify]}
-                  onPress={() => {
-                    const rec = getRecord(editTarget!.studentId, editTarget!.date);
-                    setJustifyText(rec?.justification ?? '');
-                    setJustifyMode(true);
-                  }}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="document-text-outline" size={20} color={Colors.warning} />
-                  <Text style={[styles.editOptionText, { color: Colors.warning }]}>
-                    {editTarget?.status === 'justified' ? 'Editar justificativa' : 'Justificar Falta'}
-                  </Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <Text style={styles.justifyLabel}>
-                  {editTarget?.status === 'justified' ? 'Editar justificativa' : 'Motivo da justificativa'}
-                </Text>
-                <ScrollView style={{ maxHeight: 150 }} keyboardShouldPersistTaps="handled">
-                  <TextInput
-                    style={[styles.justifyInput, { minHeight: 88 }]}
-                    placeholder="Descreva o motivo..."
-                    placeholderTextColor={Colors.textTertiary}
-                    value={justifyText}
-                    onChangeText={setJustifyText}
-                    multiline
-                    autoFocus
-                  />
-                </ScrollView>
-                <View style={styles.justifyButtons}>
-                  <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setJustifyMode(false)} activeOpacity={0.8}>
-                    <Text style={styles.modalCancelText}>Voltar</Text>
+              {!justifyMode ? (
+                <>
+                  <TouchableOpacity style={[styles.editOption, styles.editPresent]} onPress={handleSetPresent} activeOpacity={0.85}>
+                    <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+                    <Text style={[styles.editOptionText, { color: Colors.success }]}>Marcar Presente</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.editOption, styles.editAbsent]} onPress={handleSetAbsent} activeOpacity={0.85}>
+                    <Ionicons name="close-circle" size={20} color={Colors.danger} />
+                    <Text style={[styles.editOptionText, { color: Colors.danger }]}>Marcar Falta</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.modalConfirmBtn, !justifyText.trim() && styles.btnDisabled]}
-                    onPress={handleJustify}
+                    style={[styles.editOption, styles.editJustify]}
+                    onPress={() => {
+                      const rec = getRecord(editTarget!.studentId, editTarget!.date);
+                      setJustifyText(rec?.justification ?? '');
+                      setJustifyMode(true);
+                    }}
                     activeOpacity={0.85}
-                    disabled={!justifyText.trim()}
                   >
-                    <Text style={styles.modalConfirmText}>Salvar</Text>
+                    <Ionicons name="document-text-outline" size={20} color={Colors.warning} />
+                    <Text style={[styles.editOptionText, { color: Colors.warning }]}>
+                      {editTarget?.status === 'justified' ? 'Editar justificativa' : 'Justificar Falta'}
+                    </Text>
                   </TouchableOpacity>
-                </View>
-              </>
-            )}
-          </View>
-        </TouchableOpacity>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* Filter Modal */}
-      <Modal visible={showFilterModal} transparent animationType="slide">
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
-          <View style={[styles.editCard, { paddingBottom: insets.bottom + 16 }]}>
-            <View style={styles.modalHandle} />
-            <Text style={styles.editTitle}>Filtrar por data</Text>
-            <Text style={styles.editDate}>Formato: DD/MM/AAAA</Text>
-            <TextInput
-              style={styles.filterInput}
-              placeholder="Ex: 15/03/2026"
-              placeholderTextColor={Colors.textTertiary}
-              value={filterInput}
-              onChangeText={setFilterInput}
-              keyboardType="numbers-and-punctuation"
-              autoFocus
-            />
-            <View style={styles.justifyButtons}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowFilterModal(false)} activeOpacity={0.8}>
-                <Text style={styles.modalCancelText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalConfirmBtn, !filterInput.trim() && styles.btnDisabled]}
-                onPress={applyFilter}
-                activeOpacity={0.85}
-                disabled={!filterInput.trim()}
-              >
-                <Text style={styles.modalConfirmText}>Aplicar</Text>
-              </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.justifyLabel}>
+                    {editTarget?.status === 'justified' ? 'Editar justificativa' : 'Motivo da justificativa'}
+                  </Text>
+                  <ScrollView style={{ maxHeight: 150 }} keyboardShouldPersistTaps="handled">
+                    <TextInput
+                      style={[styles.justifyInput, { minHeight: 88 }]}
+                      placeholder="Descreva o motivo..."
+                      placeholderTextColor={Colors.textTertiary}
+                      value={justifyText}
+                      onChangeText={setJustifyText}
+                      multiline
+                      autoFocus
+                    />
+                  </ScrollView>
+                  <View style={styles.justifyButtons}>
+                    <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setJustifyMode(false)} activeOpacity={0.8}>
+                      <Text style={styles.modalCancelText}>Voltar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.modalConfirmBtn, !justifyText.trim() && styles.btnDisabled]}
+                      onPress={handleJustify}
+                      activeOpacity={0.85}
+                      disabled={!justifyText.trim()}
+                    >
+                      <Text style={styles.modalConfirmText}>Salvar</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
             </View>
-          </View>
+          </TouchableOpacity>
         </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -380,9 +359,9 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 6,
   },
   headerTitle: {
     fontSize: 28,
@@ -391,29 +370,27 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   headerSub: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: 'Inter_400Regular',
     color: Colors.textSecondary,
     marginTop: 2,
   },
-  filterBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
+  navBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
+    alignItems: 'center', justifyContent: 'center',
   },
-  clearBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.dangerLight,
-    alignItems: 'center',
-    justifyContent: 'center',
+  navBtnDisabled: { opacity: 0.35 },
+  calendarBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: Colors.primaryLight, borderWidth: 1, borderColor: Colors.primary,
+    alignItems: 'center', justifyContent: 'center',
   },
+  todayBtn: {
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12,
+    backgroundColor: Colors.primary,
+  },
+  todayBtnText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: '#fff' },
   tableWrapper: { paddingHorizontal: 0 },
   headerRow: {
     flexDirection: 'row',
@@ -433,7 +410,8 @@ const styles = StyleSheet.create({
   rowEven: { backgroundColor: Colors.surface },
   rowOdd: { backgroundColor: Colors.background },
   nameColumn: { width: 130, paddingHorizontal: 12, justifyContent: 'center' },
-  dayColumn: { width: 44, alignItems: 'center', justifyContent: 'center' },
+  dayColumn: { width: 50, alignItems: 'center', justifyContent: 'center' },
+  todayColumn: { backgroundColor: Colors.primaryLight + '40' },
   totalColumn: { width: 40, alignItems: 'center', justifyContent: 'center' },
   columnLabel: {
     fontSize: 11,
@@ -448,9 +426,11 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
     textTransform: 'uppercase',
   },
+  todayDayOfWeek: { color: Colors.primary },
   dayLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: Colors.text },
+  todayDayLabel: { color: Colors.primary },
   studentName: { fontSize: 13, fontFamily: 'Inter_500Medium', color: Colors.text },
-  cell: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  cell: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   cellPresent: { backgroundColor: Colors.successLight },
   cellAbsent: { backgroundColor: Colors.dangerLight },
   cellJustified: { backgroundColor: Colors.warningLight },
@@ -465,30 +445,23 @@ const styles = StyleSheet.create({
   legend: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 16,
+    gap: 12,
     paddingVertical: 10,
     paddingBottom: 16,
     borderTopWidth: 1,
     borderTopColor: Colors.borderLight,
+    flexWrap: 'wrap',
   },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendDot: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   legendText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: Colors.textSecondary },
   emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    paddingHorizontal: 40,
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    gap: 12, paddingHorizontal: 40,
   },
   emptyIcon: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: Colors.surfaceSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
+    width: 96, height: 96, borderRadius: 48, backgroundColor: Colors.surfaceSecondary,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 8,
   },
   emptyTitle: { fontSize: 20, fontFamily: 'Inter_600SemiBold', color: Colors.text, textAlign: 'center' },
   emptySubtitle: { fontSize: 15, fontFamily: 'Inter_400Regular', color: Colors.textSecondary, textAlign: 'center' },
@@ -511,12 +484,8 @@ const styles = StyleSheet.create({
   editTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: Colors.text },
   editDate: { fontSize: 13, fontFamily: 'Inter_400Regular', color: Colors.textSecondary, marginTop: -4 },
   editOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 1.5,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    padding: 16, borderRadius: 14, borderWidth: 1.5,
   },
   editPresent: { backgroundColor: Colors.successLight, borderColor: '#A8E6B8' },
   editAbsent: { backgroundColor: Colors.dangerLight, borderColor: '#FFD5D3' },
@@ -535,17 +504,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: Colors.border,
     textAlignVertical: 'top',
-  },
-  filterInput: {
-    backgroundColor: Colors.surfaceSecondary,
-    borderRadius: 12,
-    height: 52,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    fontFamily: 'Inter_400Regular',
-    color: Colors.text,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
   },
   justifyButtons: { flexDirection: 'row', gap: 12 },
   modalCancelBtn: {
