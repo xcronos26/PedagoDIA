@@ -9,6 +9,7 @@ import {
   ScrollView,
   Modal,
   TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -331,6 +332,7 @@ export default function ReportsScreen() {
 
       {/* Justification Full-View / Edit Modal */}
       <Modal visible={!!justModal} transparent animationType="slide">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <TouchableOpacity style={modalStyles.overlay} activeOpacity={1} onPress={() => setJustModal(null)}>
           <View style={[modalStyles.card, { paddingBottom: insets.bottom + 16 }]} onStartShouldSetResponder={() => true}>
             <View style={modalStyles.handle} />
@@ -403,6 +405,7 @@ export default function ReportsScreen() {
             )}
           </View>
         </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
       </View>
     );

@@ -40,9 +40,11 @@ export default function LoginScreen() {
     >
       <View style={styles.content}>
         <View style={styles.logoContainer}>
-          <View style={styles.logoCircle}>
-            <Ionicons name="school" size={48} color={Colors.primary} />
-          </View>
+          <Image
+            source={require('@/assets/images/logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
           <Text style={styles.appName}>PedagoDIA</Text>
           <Text style={styles.appSubtitle}>Gestão de Turma</Text>
         </View>
@@ -102,14 +104,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  logoCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: Colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
+  logoImage: {
+    width: 140,
+    height: 140,
+    marginBottom: 4,
+    borderRadius: 24,
   },
   appName: {
     fontSize: 32,

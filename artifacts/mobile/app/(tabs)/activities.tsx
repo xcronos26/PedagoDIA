@@ -11,6 +11,7 @@ import {
   Platform,
   ScrollView,
   Linking,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -201,6 +202,7 @@ export default function ActivitiesScreen() {
       {/* Add Subject Modal */}
       <Modal visible={showAddSubjectModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%' }}>
           <View style={[styles.modalCard, { paddingBottom: insets.bottom + 16 }]}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Nova matéria</Text>
@@ -229,12 +231,14 @@ export default function ActivitiesScreen() {
               </TouchableOpacity>
             </View>
           </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
       {/* Add Activity Modal */}
       <Modal visible={showAddModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%' }}>
           <View style={[styles.modalCard, { paddingBottom: insets.bottom + 16 }]}>
             <View style={styles.modalHandle} />
             <View style={styles.modalTitleRow}>
@@ -326,6 +330,7 @@ export default function ActivitiesScreen() {
               </View>
             </ScrollView>
           </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
