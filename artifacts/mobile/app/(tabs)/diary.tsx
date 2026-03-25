@@ -341,8 +341,7 @@ export default function DiaryScreen() {
 
       {/* Filter Modal */}
       <Modal visible={showFilterModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%' }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <View style={[styles.editCard, { paddingBottom: insets.bottom + 16 }]}>
             <View style={styles.modalHandle} />
             <Text style={styles.editTitle}>Filtrar por data</Text>
@@ -370,8 +369,7 @@ export default function DiaryScreen() {
               </TouchableOpacity>
             </View>
           </View>
-          </KeyboardAvoidingView>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

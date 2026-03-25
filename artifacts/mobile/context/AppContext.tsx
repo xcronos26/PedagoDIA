@@ -52,6 +52,7 @@ interface AppContextValue {
   setAttendanceRecord: (studentId: string, date: string, present: boolean) => Promise<void>;
   getAttendanceForDate: (date: string) => AttendanceRecord[];
   addActivity: (activity: Omit<Activity, 'id' | 'createdAt'>) => Promise<void>;
+  updateActivity: (id: string, updates: Partial<Omit<Activity, 'id' | 'createdAt'>>) => Promise<void>;
   removeActivity: (id: string) => Promise<void>;
   toggleDelivery: (activityId: string, studentId: string) => Promise<void>;
   toggleSeen: (activityId: string, studentId: string) => Promise<void>;
@@ -221,6 +222,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await saveActivities(updated);
   }, [activities]);
 
+  const updateActivity = useCallback(async (id: string, updates: Partial<Omit<Activity, 'id' | 'createdAt'>>) => {
+    const updated = activities
+      .map(a => a.id === id ? { ...a, ...updates } : a)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    await saveActivities(updated);
+  }, [activities]);
+
   const removeActivity = useCallback(async (id: string) => {
     await saveActivities(activities.filter(a => a.id !== id));
     await saveDeliveries(deliveries.filter(d => d.activityId !== id));
@@ -302,6 +310,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setAttendanceRecord,
       getAttendanceForDate,
       addActivity,
+      updateActivity,
       removeActivity,
       toggleDelivery,
       toggleSeen,

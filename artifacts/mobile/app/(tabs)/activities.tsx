@@ -19,10 +19,12 @@ import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/colors';
 import { useApp, Activity } from '@/context/AppContext';
 
-function ActivityCard({ activity, onPress, onDelete }: {
+type ActivityAction = { activity: Activity; mode: 'options' | 'edit' } | null;
+
+function ActivityCard({ activity, onPress, onLongPress }: {
   activity: Activity;
   onPress: () => void;
-  onDelete: () => void;
+  onLongPress: () => void;
 }) {
   const isHomework = activity.type === 'homework';
   const bgColor = isHomework ? Colors.homeworkLight : Colors.classworkLight;
@@ -33,16 +35,31 @@ function ActivityCard({ activity, onPress, onDelete }: {
     return `${day}/${month}/${year}`;
   }
 
+  async function handleOpenLink() {
+    if (!activity.link) return;
+    try {
+      let url = activity.link.trim();
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+      }
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert('Link inválido', 'Não foi possível abrir este link.');
+      }
+    } catch {
+      Alert.alert('Erro', 'Não foi possível abrir o link.');
+    }
+  }
+
   return (
     <TouchableOpacity
       style={[styles.activityCard, { borderLeftColor: accentColor }]}
       onPress={onPress}
       onLongPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        Alert.alert('Remover atividade', 'Remover esta atividade?', [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Remover', style: 'destructive', onPress: onDelete },
-        ]);
+        onLongPress();
       }}
       activeOpacity={0.85}
     >
@@ -62,19 +79,27 @@ function ActivityCard({ activity, onPress, onDelete }: {
       </View>
       <Text style={styles.activityDescription} numberOfLines={2}>{activity.description}</Text>
       {activity.link ? (
-        <View style={styles.linkRow}>
-          <Feather name="link" size={12} color={Colors.primary} />
+        <TouchableOpacity style={styles.linkRow} onPress={handleOpenLink} activeOpacity={0.7}>
+          <Feather name="external-link" size={12} color={Colors.primary} />
           <Text style={styles.linkText} numberOfLines={1}>{activity.link}</Text>
-        </View>
+        </TouchableOpacity>
       ) : null}
     </TouchableOpacity>
   );
 }
 
+const emptyForm = {
+  subject: '',
+  type: 'homework' as 'homework' | 'classwork',
+  link: '',
+  date: new Date().toISOString().split('T')[0],
+  description: '',
+};
+
 export default function ActivitiesScreen() {
   const insets = useSafeAreaInsets();
   const {
-    activities, students, subjects, addActivity, removeActivity,
+    activities, students, subjects, addActivity, updateActivity, removeActivity,
     toggleDelivery, toggleSeen, getDeliveriesForActivity, addSubject,
   } = useApp();
 
@@ -82,21 +107,17 @@ export default function ActivitiesScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [activityAction, setActivityAction] = useState<ActivityAction>(null);
   const [newSubjectName, setNewSubjectName] = useState('');
 
-  const [form, setForm] = useState({
-    subject: '',
-    type: 'homework' as 'homework' | 'classwork',
-    link: '',
-    date: new Date().toISOString().split('T')[0],
-    description: '',
-  });
+  const [form, setForm] = useState({ ...emptyForm });
+  const [editForm, setEditForm] = useState({ ...emptyForm });
 
   const topPadding = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPadding = Platform.OS === 'web' ? 34 : 0;
 
-  // Set default subject when subjects load
   const currentFormSubject = form.subject || subjects[0] || '';
+  const currentEditSubject = editForm.subject || subjects[0] || '';
 
   const filteredActivities = useMemo(() => {
     if (!selectedSubject) return activities;
@@ -113,7 +134,21 @@ export default function ActivitiesScreen() {
       description: form.description,
     });
     setShowAddModal(false);
-    setForm({ subject: '', type: 'homework', link: '', date: new Date().toISOString().split('T')[0], description: '' });
+    setForm({ ...emptyForm });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!activityAction || activityAction.mode !== 'edit') return;
+    if (!editForm.description.trim() || !editForm.date) return;
+    await updateActivity(activityAction.activity.id, {
+      subject: currentEditSubject,
+      type: editForm.type,
+      link: editForm.link || undefined,
+      date: editForm.date,
+      description: editForm.description,
+    });
+    setActivityAction(null);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
@@ -125,6 +160,47 @@ export default function ActivitiesScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
+  const openEditForm = (activity: Activity) => {
+    setEditForm({
+      subject: activity.subject,
+      type: activity.type,
+      link: activity.link || '',
+      date: activity.date,
+      description: activity.description,
+    });
+    setActivityAction({ activity, mode: 'edit' });
+  };
+
+  const handleDeleteActivity = (activity: Activity) => {
+    Alert.alert('Remover atividade', 'Remover esta atividade?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Remover', style: 'destructive',
+        onPress: () => {
+          removeActivity(activity.id);
+          setActivityAction(null);
+        },
+      },
+    ]);
+  };
+
+  async function openLink(url: string) {
+    try {
+      let finalUrl = url.trim();
+      if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+        finalUrl = 'https://' + finalUrl;
+      }
+      const supported = await Linking.canOpenURL(finalUrl);
+      if (supported) {
+        await Linking.openURL(finalUrl);
+      } else {
+        Alert.alert('Link inválido', 'Não foi possível abrir este link.');
+      }
+    } catch {
+      Alert.alert('Erro', 'Não foi possível abrir o link.');
+    }
+  }
+
   const deliveries = selectedActivity ? getDeliveriesForActivity(selectedActivity.id) : [];
   const getDelivery = (studentId: string) => deliveries.find(d => d.studentId === studentId);
   const isDelivered = (studentId: string) => getDelivery(studentId)?.delivered ?? false;
@@ -132,6 +208,8 @@ export default function ActivitiesScreen() {
 
   const deliveredCount = students.filter(s => isDelivered(s.id)).length;
   const seenCount = students.filter(s => isSeen(s.id)).length;
+
+  const kavBehavior = Platform.OS === 'ios' ? 'padding' : 'height';
 
   return (
     <View style={[styles.container, { paddingTop: topPadding }]}>
@@ -142,7 +220,6 @@ export default function ActivitiesScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Subject filter row */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.subjectFilter} contentContainerStyle={styles.subjectFilterContent}>
         <TouchableOpacity
           style={[styles.subjectChip, !selectedSubject && styles.subjectChipActive]}
@@ -191,7 +268,7 @@ export default function ActivitiesScreen() {
             <ActivityCard
               activity={item}
               onPress={() => setSelectedActivity(item)}
-              onDelete={() => removeActivity(item.id)}
+              onLongPress={() => setActivityAction({ activity: item, mode: 'options' })}
             />
           )}
           contentContainerStyle={[styles.list, { paddingBottom: bottomPadding + 100 }]}
@@ -201,8 +278,7 @@ export default function ActivitiesScreen() {
 
       {/* Add Subject Modal */}
       <Modal visible={showAddSubjectModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%' }}>
+        <KeyboardAvoidingView behavior={kavBehavior} style={styles.modalOverlay}>
           <View style={[styles.modalCard, { paddingBottom: insets.bottom + 16 }]}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Nova matéria</Text>
@@ -231,14 +307,12 @@ export default function ActivitiesScreen() {
               </TouchableOpacity>
             </View>
           </View>
-          </KeyboardAvoidingView>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Add Activity Modal */}
       <Modal visible={showAddModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%' }}>
+        <KeyboardAvoidingView behavior={kavBehavior} style={styles.modalOverlay}>
           <View style={[styles.modalCard, { paddingBottom: insets.bottom + 16 }]}>
             <View style={styles.modalHandle} />
             <View style={styles.modalTitleRow}>
@@ -330,8 +404,135 @@ export default function ActivitiesScreen() {
               </View>
             </ScrollView>
           </View>
-          </KeyboardAvoidingView>
-        </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Activity Options Modal (long press) */}
+      <Modal visible={!!activityAction && activityAction.mode === 'options'} transparent animationType="slide">
+        <KeyboardAvoidingView behavior={kavBehavior} style={{ flex: 1 }}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setActivityAction(null)}>
+            <View style={[styles.modalCard, { paddingBottom: insets.bottom + 16 }]} onStartShouldSetResponder={() => true}>
+              <View style={styles.modalHandle} />
+              <Text style={styles.modalTitle} numberOfLines={2}>{activityAction?.activity.description}</Text>
+              <TouchableOpacity
+                style={[styles.optionRow, styles.optionEdit]}
+                onPress={() => activityAction && openEditForm(activityAction.activity)}
+                activeOpacity={0.85}
+              >
+                <Feather name="edit-2" size={20} color={Colors.primary} />
+                <Text style={[styles.optionText, { color: Colors.primary }]}>Editar atividade</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.optionRow, styles.optionDelete]}
+                onPress={() => activityAction && handleDeleteActivity(activityAction.activity)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="trash-outline" size={20} color={Colors.danger} />
+                <Text style={[styles.optionText, { color: Colors.danger }]}>Remover atividade</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setActivityAction(null)} activeOpacity={0.8}>
+                <Text style={styles.modalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Edit Activity Modal */}
+      <Modal visible={!!activityAction && activityAction.mode === 'edit'} transparent animationType="slide">
+        <KeyboardAvoidingView behavior={kavBehavior} style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { paddingBottom: insets.bottom + 16 }]}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalTitleRow}>
+              <Text style={styles.modalTitle}>Editar atividade</Text>
+              <TouchableOpacity onPress={() => setActivityAction(null)}>
+                <Ionicons name="close" size={24} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={styles.fieldLabel}>Matéria</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {subjects.map(sub => (
+                    <TouchableOpacity
+                      key={sub}
+                      style={[styles.subjectChip, currentEditSubject === sub && styles.subjectChipActive]}
+                      onPress={() => setEditForm(f => ({ ...f, subject: sub }))}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.subjectChipText, currentEditSubject === sub && styles.subjectChipTextActive]}>{sub}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+
+              <Text style={styles.fieldLabel}>Tipo</Text>
+              <View style={styles.typeRow}>
+                <TouchableOpacity
+                  style={[styles.typeBtn, editForm.type === 'homework' && styles.typeBtnActive]}
+                  onPress={() => setEditForm(f => ({ ...f, type: 'homework' }))}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="home-outline" size={16} color={editForm.type === 'homework' ? Colors.homework : Colors.textSecondary} />
+                  <Text style={[styles.typeBtnText, editForm.type === 'homework' && { color: Colors.homework }]}>Para casa</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.typeBtn, editForm.type === 'classwork' && styles.typeBtnActiveClass]}
+                  onPress={() => setEditForm(f => ({ ...f, type: 'classwork' }))}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="school-outline" size={16} color={editForm.type === 'classwork' ? Colors.classwork : Colors.textSecondary} />
+                  <Text style={[styles.typeBtnText, editForm.type === 'classwork' && { color: Colors.classwork }]}>Em sala</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.fieldLabel}>Descrição</Text>
+              <TextInput
+                style={[styles.modalInput, styles.textArea]}
+                placeholder="Descrição da atividade"
+                placeholderTextColor={Colors.textTertiary}
+                value={editForm.description}
+                onChangeText={t => setEditForm(f => ({ ...f, description: t }))}
+                multiline
+                numberOfLines={3}
+              />
+
+              <Text style={styles.fieldLabel}>Data</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="AAAA-MM-DD"
+                placeholderTextColor={Colors.textTertiary}
+                value={editForm.date}
+                onChangeText={t => setEditForm(f => ({ ...f, date: t }))}
+              />
+
+              <Text style={styles.fieldLabel}>Link (opcional)</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="https://..."
+                placeholderTextColor={Colors.textTertiary}
+                value={editForm.link}
+                onChangeText={t => setEditForm(f => ({ ...f, link: t }))}
+                keyboardType="url"
+                autoCapitalize="none"
+              />
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setActivityAction(null)} activeOpacity={0.8}>
+                  <Text style={styles.modalCancelText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalConfirmBtn, (!editForm.description.trim() || !editForm.date) && styles.btnDisabled]}
+                  onPress={handleSaveEdit}
+                  activeOpacity={0.85}
+                  disabled={!editForm.description.trim() || !editForm.date}
+                >
+                  <Text style={styles.modalConfirmText}>Salvar</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Activity Delivery Modal */}
@@ -359,7 +560,6 @@ export default function ActivitiesScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Stats */}
               <View style={styles.deliveryStats}>
                 <View style={styles.deliveryStat}>
                   <Text style={[styles.deliveryStatNum, { color: Colors.success }]}>{deliveredCount}</Text>
@@ -378,7 +578,7 @@ export default function ActivitiesScreen() {
               </View>
 
               {selectedActivity.link ? (
-                <TouchableOpacity style={styles.viewLinkBtn} onPress={() => Linking.openURL(selectedActivity.link!)} activeOpacity={0.85}>
+                <TouchableOpacity style={styles.viewLinkBtn} onPress={() => openLink(selectedActivity.link!)} activeOpacity={0.85}>
                   <Feather name="external-link" size={16} color={Colors.primary} />
                   <Text style={styles.viewLinkText}>Visualizar atividade</Text>
                 </TouchableOpacity>
@@ -504,69 +704,76 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalCard: {
     backgroundColor: Colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 24, gap: 12,
+    padding: 20, gap: 12,
   },
-  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: 'center', marginBottom: 8 },
-  modalTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
-  modalTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', color: Colors.text },
-  fieldLabel: {
-    fontSize: 13, fontFamily: 'Inter_600SemiBold', color: Colors.textSecondary,
-    textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6, marginTop: 4,
+  modalHandle: {
+    width: 40, height: 4, backgroundColor: Colors.border,
+    borderRadius: 2, alignSelf: 'center', marginBottom: 4,
   },
+  modalTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  modalTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', color: Colors.text, flex: 1 },
+  modalInput: {
+    backgroundColor: Colors.surfaceSecondary, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14,
+    fontSize: 16, fontFamily: 'Inter_400Regular', color: Colors.text, borderWidth: 1.5, borderColor: Colors.border,
+  },
+  textArea: { minHeight: 80, textAlignVertical: 'top' },
+  fieldLabel: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: Colors.textSecondary, marginBottom: 6, marginTop: 4 },
+  modalButtons: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  modalCancelBtn: {
+    flex: 1, paddingVertical: 14, borderRadius: 14,
+    backgroundColor: Colors.surfaceSecondary, alignItems: 'center',
+    borderWidth: 1.5, borderColor: Colors.border,
+  },
+  modalCancelText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: Colors.textSecondary },
+  modalConfirmBtn: {
+    flex: 1, paddingVertical: 14, borderRadius: 14,
+    backgroundColor: Colors.primary, alignItems: 'center',
+  },
+  modalConfirmText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: '#fff' },
+  btnDisabled: { opacity: 0.4 },
   typeRow: { flexDirection: 'row', gap: 10, marginBottom: 4 },
   typeBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    padding: 12, borderRadius: 12, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.surfaceSecondary,
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: Colors.border,
+    backgroundColor: Colors.surfaceSecondary,
   },
   typeBtnActive: { borderColor: Colors.homework, backgroundColor: Colors.homeworkLight },
   typeBtnActiveClass: { borderColor: Colors.classwork, backgroundColor: Colors.classworkLight },
   typeBtnText: { fontSize: 14, fontFamily: 'Inter_500Medium', color: Colors.textSecondary },
-  modalInput: {
-    backgroundColor: Colors.surfaceSecondary, borderRadius: 12, height: 52,
-    paddingHorizontal: 16, fontSize: 16, fontFamily: 'Inter_400Regular', color: Colors.text,
-    borderWidth: 1.5, borderColor: Colors.border, marginBottom: 4,
+  optionRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingVertical: 16, paddingHorizontal: 4, borderRadius: 12,
   },
-  textArea: { height: 88, paddingTop: 14, textAlignVertical: 'top' },
-  modalButtons: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  modalCancelBtn: { flex: 1, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: Colors.surfaceSecondary },
-  modalCancelText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: Colors.textSecondary },
-  modalConfirmBtn: {
-    flex: 1, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: Colors.primary,
-    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
-  },
-  modalConfirmText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: '#fff' },
-  btnDisabled: { opacity: 0.5 },
+  optionEdit: { backgroundColor: Colors.primaryLight, paddingHorizontal: 16 },
+  optionDelete: { backgroundColor: '#FEF2F2', paddingHorizontal: 16 },
+  optionText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   deliveryStats: {
     flexDirection: 'row', backgroundColor: Colors.surfaceSecondary,
-    borderRadius: 16, padding: 16, gap: 8, justifyContent: 'center',
+    borderRadius: 16, padding: 16, justifyContent: 'space-around',
   },
-  deliveryStat: { alignItems: 'center', flex: 1 },
+  deliveryStat: { alignItems: 'center', gap: 4 },
   deliveryStatNum: { fontSize: 24, fontFamily: 'Inter_700Bold' },
-  deliveryStatLabel: { fontSize: 12, fontFamily: 'Inter_400Regular', color: Colors.textSecondary, marginTop: 2 },
+  deliveryStatLabel: { fontSize: 12, fontFamily: 'Inter_400Regular', color: Colors.textSecondary },
   deliveryDivider: { width: 1, backgroundColor: Colors.border, marginVertical: 4 },
   viewLinkBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: Colors.primaryLight, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16,
+    backgroundColor: Colors.primaryLight, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12,
   },
   viewLinkText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: Colors.primary },
+  noStudentsText: { fontSize: 14, fontFamily: 'Inter_400Regular', color: Colors.textSecondary, textAlign: 'center', paddingVertical: 12 },
   deliveryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
-  deliveryStudentName: { fontSize: 15, fontFamily: 'Inter_500Medium', color: Colors.text, flex: 1 },
+  deliveryStudentName: { fontSize: 15, fontFamily: 'Inter_500Medium', color: Colors.text, flex: 1, marginRight: 12 },
   deliveryActions: { flexDirection: 'row', gap: 8 },
   deliveryActionBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
+    borderWidth: 1.5, borderColor: Colors.border,
   },
-  deliveryActionEmpty: { borderColor: Colors.border, backgroundColor: Colors.surfaceSecondary },
-  deliveryActionDelivered: { borderColor: Colors.success, backgroundColor: Colors.successLight },
-  deliveryActionSeen: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
-  deliveryActionLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: Colors.textTertiary },
-  noStudentsText: { fontSize: 15, fontFamily: 'Inter_400Regular', color: Colors.textSecondary, textAlign: 'center', paddingVertical: 16 },
+  deliveryActionEmpty: { backgroundColor: Colors.surfaceSecondary },
+  deliveryActionDelivered: { backgroundColor: '#F0FDF4', borderColor: Colors.success },
+  deliveryActionSeen: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary },
+  deliveryActionLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', color: Colors.textTertiary },
 });
