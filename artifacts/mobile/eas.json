@@ -8,8 +8,11 @@
       "projectRoot": ".",
       "developmentClient": true,
       "distribution": "internal",
-      "node": "22",
-      "pnpm": "10"
+      "node": "20",
+      "pnpm": "10",
+      "env": {
+        "EXPO_USE_PNPM": "1"
+      }
     },
     "preview": {
       "projectRoot": ".",
@@ -17,15 +20,18 @@
         "buildType": "apk"
       },
       "distribution": "internal",
-      "node": "22",
-      "pnpm": "10"
+      "node": "20",
+      "pnpm": "10",
+      "env": {
+        "EXPO_USE_PNPM": "1"
+      }
     },
     "production": {
       "projectRoot": ".",
       "android": {
         "buildType": "app-bundle"
       },
-      "node": "22",
+      "node": "20",
       "pnpm": "10",
       "env": {
         "EXPO_USE_PNPM": "1"

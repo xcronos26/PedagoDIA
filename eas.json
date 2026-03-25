@@ -8,8 +8,11 @@
       "projectRoot": "artifacts/mobile",
       "developmentClient": true,
       "distribution": "internal",
-      "node": "22",
-      "pnpm": "10"
+      "node": "20",
+      "pnpm": "10",
+      "env": {
+        "EXPO_USE_PNPM": "1"
+      }
     },
     "preview": {
       "projectRoot": "artifacts/mobile",
@@ -17,15 +20,18 @@
         "buildType": "apk"
       },
       "distribution": "internal",
-      "node": "22",
-      "pnpm": "10"
+      "node": "20",
+      "pnpm": "10",
+      "env": {
+        "EXPO_USE_PNPM": "1"
+      }
     },
     "production": {
       "projectRoot": "artifacts/mobile",
       "android": {
         "buildType": "app-bundle"
       },
-      "node": "22",
+      "node": "20",
       "pnpm": "10",
       "env": {
         "EXPO_USE_PNPM": "1"
