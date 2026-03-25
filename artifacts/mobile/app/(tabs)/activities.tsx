@@ -202,7 +202,7 @@ export default function ActivitiesScreen() {
       {/* Add Subject Modal */}
       <Modal visible={showAddSubjectModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%' }}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%' }}>
           <View style={[styles.modalCard, { paddingBottom: insets.bottom + 16 }]}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Nova matéria</Text>
@@ -238,7 +238,7 @@ export default function ActivitiesScreen() {
       {/* Add Activity Modal */}
       <Modal visible={showAddModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%' }}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%' }}>
           <View style={[styles.modalCard, { paddingBottom: insets.bottom + 16 }]}>
             <View style={styles.modalHandle} />
             <View style={styles.modalTitleRow}>
