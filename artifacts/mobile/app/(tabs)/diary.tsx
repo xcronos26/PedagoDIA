@@ -10,6 +10,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
 } from 'react-native';
+import { DataLoadingWrapper } from '@/components/DataLoadingWrapper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,7 +33,7 @@ type EditTarget = { studentId: string; studentName: string; date: string; status
 
 export default function DiaryScreen() {
   const insets = useSafeAreaInsets();
-  const { students, attendance, setAttendanceRecord, justifyAbsence, getAttendanceForDate } = useApp();
+  const { students, attendance, setAttendanceRecord, justifyAbsence, getAttendanceForDate, isLoaded, loadError, loadData } = useApp();
 
   const [weekOffset, setWeekOffset] = useState(0);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -161,6 +162,7 @@ export default function DiaryScreen() {
         />
       )}
 
+      <DataLoadingWrapper isLoaded={isLoaded} loadError={loadError} onRetry={loadData}>
       {students.length === 0 ? (
         <View style={styles.emptyState}>
           <View style={styles.emptyIcon}>
@@ -253,8 +255,10 @@ export default function DiaryScreen() {
         </ScrollView>
       )}
 
+      </DataLoadingWrapper>
+
       {/* Legend */}
-      {students.length > 0 && (
+      {students.length > 0 && isLoaded && !loadError && (
         <View style={styles.legend}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: Colors.successLight }]}>

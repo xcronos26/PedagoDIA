@@ -13,6 +13,7 @@ import {
   Linking,
   KeyboardAvoidingView,
 } from 'react-native';
+import { DataLoadingWrapper } from '@/components/DataLoadingWrapper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -103,6 +104,7 @@ export default function ActivitiesScreen() {
   const {
     activities, students, subjects, addActivity, updateActivity, removeActivity,
     toggleDelivery, toggleSeen, getDeliveriesForActivity, addSubject,
+    isLoaded, loadError, loadData,
   } = useApp();
 
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
@@ -252,6 +254,7 @@ export default function ActivitiesScreen() {
         </TouchableOpacity>
       </ScrollView>
 
+      <DataLoadingWrapper isLoaded={isLoaded} loadError={loadError} onRetry={loadData}>
       {filteredActivities.length === 0 ? (
         <View style={styles.emptyState}>
           <View style={styles.emptyIcon}>
@@ -279,6 +282,7 @@ export default function ActivitiesScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+      </DataLoadingWrapper>
 
       {/* Add Subject Modal */}
       <Modal visible={showAddSubjectModal} transparent animationType="slide">

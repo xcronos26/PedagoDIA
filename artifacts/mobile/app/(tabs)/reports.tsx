@@ -11,6 +11,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
 } from 'react-native';
+import { DataLoadingWrapper } from '@/components/DataLoadingWrapper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -131,7 +132,7 @@ type JustificationModal = { rec: AttendanceRecord; date: string; mode: 'view' | 
 
 export default function ReportsScreen() {
   const insets = useSafeAreaInsets();
-  const { students, activities, attendance, getDeliveriesForStudent, justifyAbsence } = useApp();
+  const { students, activities, attendance, getDeliveriesForStudent, justifyAbsence, isLoaded, loadError, loadData } = useApp();
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<'activities' | 'attendance'>('activities');
@@ -420,6 +421,7 @@ export default function ReportsScreen() {
         </View>
       </View>
 
+      <DataLoadingWrapper isLoaded={isLoaded} loadError={loadError} onRetry={loadData}>
       {students.length === 0 ? (
         <View style={styles.emptyState}>
           <View style={styles.emptyIcon}>
@@ -439,6 +441,7 @@ export default function ReportsScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+      </DataLoadingWrapper>
     </View>
   );
 }

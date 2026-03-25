@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiFetch } from '@/utils/api';
 
-const TOKEN_KEY = '@pedagogia:token';
-const TEACHER_KEY = '@pedagogia:teacher';
+const TOKEN_KEY = 'pedagogia_token';
+const TEACHER_KEY = 'pedagogia_teacher';
 
 export type Teacher = {
   id: string;
@@ -23,6 +25,29 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+async function saveSecure(key: string, value: string) {
+  if (Platform.OS === 'web') {
+    await AsyncStorage.setItem(key, value);
+  } else {
+    await SecureStore.setItemAsync(key, value);
+  }
+}
+
+async function loadSecure(key: string): Promise<string | null> {
+  if (Platform.OS === 'web') {
+    return AsyncStorage.getItem(key);
+  }
+  return SecureStore.getItemAsync(key);
+}
+
+async function deleteSecure(key: string) {
+  if (Platform.OS === 'web') {
+    await AsyncStorage.removeItem(key);
+  } else {
+    await SecureStore.deleteItemAsync(key);
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [teacher, setTeacher] = useState<Teacher | null>(null);
@@ -32,8 +57,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const restore = async () => {
       try {
         const [savedToken, savedTeacher] = await Promise.all([
-          AsyncStorage.getItem(TOKEN_KEY),
-          AsyncStorage.getItem(TEACHER_KEY),
+          loadSecure(TOKEN_KEY),
+          loadSecure(TEACHER_KEY),
         ]);
         if (savedToken && savedTeacher) {
           try {
@@ -41,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setToken(savedToken);
             setTeacher(me.teacher);
           } catch {
-            await AsyncStorage.multiRemove([TOKEN_KEY, TEACHER_KEY]);
+            await Promise.all([deleteSecure(TOKEN_KEY), deleteSecure(TEACHER_KEY)]);
           }
         }
       } catch (e) {
@@ -58,8 +83,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    await AsyncStorage.setItem(TOKEN_KEY, data.token);
-    await AsyncStorage.setItem(TEACHER_KEY, JSON.stringify(data.teacher));
+    await saveSecure(TOKEN_KEY, data.token);
+    await saveSecure(TEACHER_KEY, JSON.stringify(data.teacher));
     setToken(data.token);
     setTeacher(data.teacher);
   }, []);
@@ -69,14 +94,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: 'POST',
       body: JSON.stringify({ name, email, password }),
     });
-    await AsyncStorage.setItem(TOKEN_KEY, data.token);
-    await AsyncStorage.setItem(TEACHER_KEY, JSON.stringify(data.teacher));
+    await saveSecure(TOKEN_KEY, data.token);
+    await saveSecure(TEACHER_KEY, JSON.stringify(data.teacher));
     setToken(data.token);
     setTeacher(data.teacher);
   }, []);
 
   const logout = useCallback(async () => {
-    await AsyncStorage.multiRemove([TOKEN_KEY, TEACHER_KEY]);
+    await Promise.all([deleteSecure(TOKEN_KEY), deleteSecure(TEACHER_KEY)]);
     setToken(null);
     setTeacher(null);
   }, []);

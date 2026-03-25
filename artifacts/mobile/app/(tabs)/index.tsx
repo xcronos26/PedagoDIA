@@ -18,6 +18,7 @@ import { router } from 'expo-router';
 import { Colors } from '@/constants/colors';
 import { useApp, Student } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
+import { DataLoadingWrapper } from '@/components/DataLoadingWrapper';
 
 function formatDate(date: Date) {
   return date.toISOString().split('T')[0];
@@ -93,7 +94,7 @@ function StudentCard({ student, isAbsent, onToggle, onLongPress }: {
 
 export default function AttendanceScreen() {
   const insets = useSafeAreaInsets();
-  const { students, addStudent, removeStudent, editStudent, toggleAttendance, getAttendanceForDate } = useApp();
+  const { students, addStudent, removeStudent, editStudent, toggleAttendance, getAttendanceForDate, isLoaded, loadError, loadData } = useApp();
   const { teacher, logout } = useAuth();
   const [selectedDate] = useState(formatDate(new Date()));
   const [showAddModal, setShowAddModal] = useState(false);
@@ -173,6 +174,7 @@ export default function AttendanceScreen() {
         </View>
       </View>
 
+      <DataLoadingWrapper isLoaded={isLoaded} loadError={loadError} onRetry={loadData}>
       {students.length > 0 && (
         <View style={styles.statsRow}>
           <View style={[styles.statBadge, { backgroundColor: Colors.successLight }]}>
@@ -214,6 +216,8 @@ export default function AttendanceScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      </DataLoadingWrapper>
 
       {/* Add Student Modal */}
       <Modal visible={showAddModal} transparent animationType="slide">
