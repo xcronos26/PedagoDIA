@@ -5,14 +5,14 @@
   },
   "build": {
     "development": {
-      "projectRoot": ".",
+      "projectRoot": "artifacts/mobile",
       "developmentClient": true,
       "distribution": "internal",
       "node": "22",
       "pnpm": "10"
     },
     "preview": {
-      "projectRoot": ".",
+      "projectRoot": "artifacts/mobile",
       "android": {
         "buildType": "apk"
       },
@@ -21,7 +21,7 @@
       "pnpm": "10"
     },
     "production": {
-      "projectRoot": ".",
+      "projectRoot": "artifacts/mobile",
       "android": {
         "buildType": "app-bundle"
       },
