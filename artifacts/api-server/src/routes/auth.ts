@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import bcrypt from "bcryptjs";
 import { db, teachersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { generateToken } from "../middlewares/auth";
+import { generateToken, requireAuth } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -73,25 +73,18 @@ router.post("/auth/login", async (req, res) => {
   }
 });
 
-router.get("/auth/me", async (req, res) => {
-  const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith("Bearer ")) {
-    res.status(401).json({ error: "Não autenticado" });
-    return;
-  }
+router.get("/auth/me", requireAuth, async (req, res) => {
   try {
-    const jwt = await import("jsonwebtoken");
-    const secret = process.env.JWT_SECRET ?? "pedagogia-dev-secret-change-in-production";
-    const payload = jwt.default.verify(auth.slice(7), secret) as { teacherId: string };
     const [teacher] = await db.select({ id: teachersTable.id, name: teachersTable.name, email: teachersTable.email })
-      .from(teachersTable).where(eq(teachersTable.id, payload.teacherId));
+      .from(teachersTable).where(eq(teachersTable.id, req.teacherId!));
     if (!teacher) {
       res.status(404).json({ error: "Professora não encontrada" });
       return;
     }
     res.json({ teacher });
-  } catch {
-    res.status(401).json({ error: "Token inválido ou expirado" });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching teacher profile");
+    res.status(500).json({ error: "Erro interno do servidor" });
   }
 });
 

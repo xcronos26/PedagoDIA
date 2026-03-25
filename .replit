@@ -28,4 +28,4 @@ timeoutMs = 20000
 [userenv]
 
 [userenv.shared]
-JWT_SECRET = "pedagogia-jwt-u70bm04bdl1774440554949"
+JWT_SECRET = "pedagogia-0e971b7eeeb029a52c5b5586da85afc91fb238290bbc74ba9f5af2bbd107ef11"

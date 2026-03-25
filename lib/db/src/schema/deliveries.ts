@@ -4,7 +4,7 @@ import { z } from "zod/v4";
 
 export const deliveriesTable = pgTable("deliveries", {
   id: text("id").primaryKey(),
-  teacherId: text("teacher_id"),
+  teacherId: text("teacher_id").notNull(),
   activityId: text("activity_id").notNull(),
   studentId: text("student_id").notNull(),
   delivered: boolean("delivered").notNull().default(false),

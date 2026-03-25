@@ -1,7 +1,16 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET ?? "pedagogia-dev-secret-change-in-production";
+const JWT_SECRET = (() => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("JWT_SECRET environment variable is required. Set it as a Replit Secret.");
+    }
+    return "pedagogia-dev-only-not-for-production-" + Math.random().toString(36).slice(2);
+  }
+  return secret;
+})();
 
 export interface JwtPayload {
   teacherId: string;
