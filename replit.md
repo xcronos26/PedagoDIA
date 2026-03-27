@@ -50,6 +50,20 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 
 ## PedagoDIA App
 
+### Web App (`artifacts/web`)
+React + Vite web app (PedagoDIA Web) at `/web/` path. Full-featured classroom management for teachers via browser.
+
+- **Auth**: JWT-based login/register; token stored in `localStorage` as `pedagogia_token` / `pedagogia_teacher`
+- **Pages**: Login (`/web/login`), Register (`/web/register`), main layout with 4 tabs
+- **Tabs**: Chamada (daily attendance), Diário (diary/notes), Atividades (activities + delivery tracking), Relatórios (per-student reports with charts)
+- **Theme**: Warm coral/orange primary (`hsl(15 85% 60%)`), Nunito (body) + Outfit (display fonts)
+- **Routing**: Wouter with base `/web`, auto-redirect to login on 401
+- **API client**: `src/lib/api.ts` — calls `/api` (absolute path, shared Replit proxy domain)
+- **State**: TanStack Query for all data fetching + cache invalidation
+- **Charts**: Recharts `PieChart` for attendance/activity percentages in reports
+- **Animations**: `tw-animate-css` + custom `animate-slide-up` keyframe
+- **Layout**: Sidebar on desktop (md+), bottom nav on mobile
+
 ### Mobile App (`artifacts/mobile`)
 Expo React Native app (PedagoDIA) for classroom management. Features multi-teacher authentication with isolated data per teacher.
 

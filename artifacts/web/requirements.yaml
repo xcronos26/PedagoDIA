@@ -1,0 +1,20 @@
+packages:
+  "date-fns": "For manipulating and formatting dates in the attendance and diary views"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility for merging tailwind classes without style conflicts"
+  "lucide-react": "Beautiful consistent icons"
+  "framer-motion": "For smooth page transitions and interactive micro-animations"
+  "recharts": "For the student reports and statistics charts"
+
+images:
+  - path: "artifacts/web/public/images/auth-bg.png"
+    description: "A beautiful, warm, minimalist abstract illustration of a modern classroom or educational elements like books and apples, in soft pastel coral, warm yellow, and cream tones, highly stylized and professional."
+    aspect_ratio: "9:16"
+  - path: "artifacts/web/public/images/empty-state.png"
+    description: "A cute, soft 3D minimal illustration of an empty desk or open notebook, indicating no data, in warm cheerful colors"
+    aspect_ratio: "1:1"
+
+notes:
+  - The API is strictly at the absolute path /api/*
+  - JWT tokens are stored in localStorage
+  - Unauthenticated requests (401) will immediately trigger a client-side redirect to /login
