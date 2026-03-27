@@ -93,9 +93,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <GraduationCap className="w-6 h-6" />
             PedagoDIA
           </div>
-          <button onClick={logout} className="text-muted-foreground p-2 rounded-lg hover:bg-muted">
-            <LogOut className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-sm">
+              {user.name.charAt(0).toUpperCase()}
+            </div>
+            <span className="text-sm font-semibold text-foreground hidden xs:block truncate max-w-[100px]">{user.name.split(" ")[0]}</span>
+            <button onClick={logout} className="text-muted-foreground p-2 rounded-lg hover:bg-muted">
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
         </header>
         
         <div className="flex-1">
