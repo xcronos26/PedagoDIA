@@ -14,7 +14,7 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-function ActivityCard({ activity }: { activity: Activity }) {
+function ActivityCard({ activity, onEdit }: { activity: Activity; onEdit: (a: Activity) => void }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const { data: students } = useStudents();
   const { data: deliveries } = useDeliveries(activity.id);
@@ -95,6 +95,13 @@ function ActivityCard({ activity }: { activity: Activity }) {
               </a>
             )}
             <button 
+              onClick={e => { e.stopPropagation(); onEdit(activity); }}
+              className="p-2 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-lg transition-colors"
+              title="Editar Atividade"
+            >
+              <Edit2 className="w-5 h-5" />
+            </button>
+            <button 
               onClick={handleDelete}
               className="p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-lg transition-colors"
               title="Excluir Atividade"
@@ -151,36 +158,82 @@ function ActivityCard({ activity }: { activity: Activity }) {
   );
 }
 
+type FormData = {
+  subject: string;
+  type: "homework" | "classwork";
+  date: string;
+  description: string;
+  link: string;
+};
+
+const emptyForm: FormData = {
+  subject: "",
+  type: "classwork",
+  date: format(new Date(), 'yyyy-MM-dd'),
+  description: "",
+  link: "",
+};
+
 export default function Atividades() {
   const { data: activities, isLoading } = useActivities();
   const { data: subjects } = useSubjects();
   const { mutate: createActivity, isPending: creating } = useCreateActivity();
+  const { mutate: updateActivity, isPending: updating } = useUpdateActivity();
   const { toast } = useToast();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    subject: "",
-    type: "classwork" as "homework" | "classwork",
-    date: format(new Date(), 'yyyy-MM-dd'),
-    description: "",
-    link: ""
-  });
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  const [formData, setFormData] = useState<FormData>(emptyForm);
+
+  const openCreate = () => {
+    setEditingActivity(null);
+    setFormData(emptyForm);
+    setIsModalOpen(true);
+  };
+
+  const openEdit = (activity: Activity) => {
+    setEditingActivity(activity);
+    setFormData({
+      subject: activity.subject,
+      type: activity.type,
+      date: activity.date,
+      description: activity.description,
+      link: activity.link ?? "",
+    });
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingActivity(null);
+    setFormData(emptyForm);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.subject.trim() || !formData.description.trim()) return;
 
-    createActivity({
+    const payload = {
       ...formData,
       subject: formData.subject.trim(),
-      description: formData.description.trim()
-    }, {
-      onSuccess: () => {
-        setIsModalOpen(false);
-        setFormData({ subject: "", type: "classwork", date: format(new Date(), 'yyyy-MM-dd'), description: "", link: "" });
-        toast({ title: "Atividade criada com sucesso!" });
-      }
-    });
+      description: formData.description.trim(),
+    };
+
+    if (editingActivity) {
+      updateActivity({ id: editingActivity.id, ...payload }, {
+        onSuccess: () => {
+          closeModal();
+          toast({ title: "Atividade atualizada!" });
+        },
+      });
+    } else {
+      createActivity(payload, {
+        onSuccess: () => {
+          closeModal();
+          toast({ title: "Atividade criada com sucesso!" });
+        },
+      });
+    }
   };
 
   return (
@@ -193,7 +246,7 @@ export default function Atividades() {
         </div>
 
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={openCreate}
           className="bg-primary text-primary-foreground px-6 py-3 rounded-xl font-bold shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all flex items-center gap-2"
         >
           <Plus className="w-5 h-5" />
@@ -218,7 +271,7 @@ export default function Atividades() {
               Crie a primeira atividade para começar a acompanhar as entregas dos alunos.
             </p>
             <button 
-              onClick={() => setIsModalOpen(true)}
+              onClick={openCreate}
               className="bg-primary text-primary-foreground px-8 py-4 rounded-xl font-bold shadow-lg shadow-primary/20 hover:-translate-y-1 transition-all"
             >
               Criar Atividade
@@ -226,17 +279,19 @@ export default function Atividades() {
           </div>
         ) : (
           activities?.map(act => (
-            <ActivityCard key={act.id} activity={act} />
+            <ActivityCard key={act.id} activity={act} onEdit={openEdit} />
           ))
         )}
       </div>
 
-      {/* Create Modal */}
+      {/* Create / Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-card rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
             <div className="p-6 border-b border-border/50 shrink-0">
-              <h2 className="text-2xl font-display font-bold text-foreground">Nova Atividade</h2>
+              <h2 className="text-2xl font-display font-bold text-foreground">
+                {editingActivity ? "Editar Atividade" : "Nova Atividade"}
+              </h2>
             </div>
             <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5">
               
@@ -314,18 +369,18 @@ export default function Atividades() {
               <div className="pt-4 flex gap-3 justify-end shrink-0">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={closeModal}
                   className="px-6 py-3 rounded-xl font-bold text-muted-foreground hover:bg-muted transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={creating}
+                  disabled={creating || updating}
                   className="px-6 py-3 rounded-xl font-bold bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all disabled:opacity-50 flex items-center gap-2"
                 >
-                  {creating && <Loader2 className="w-5 h-5 animate-spin" />}
-                  Salvar Atividade
+                  {(creating || updating) && <Loader2 className="w-5 h-5 animate-spin" />}
+                  {editingActivity ? "Salvar Alterações" : "Salvar Atividade"}
                 </button>
               </div>
             </form>

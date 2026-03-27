@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { CalendarDays, CheckSquare, BookOpen, BarChart3, LogOut, GraduationCap, Menu, Plus } from "lucide-react";
+import { CalendarDays, CheckSquare, BookOpen, BarChart3, LogOut, GraduationCap, LayoutDashboard } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -24,6 +24,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }
 
   const navItems = [
+    { name: "Início", href: "/", icon: LayoutDashboard },
     { name: "Chamada", href: "/chamada", icon: CheckSquare },
     { name: "Diário", href: "/diario", icon: CalendarDays },
     { name: "Atividades", href: "/atividades", icon: BookOpen },

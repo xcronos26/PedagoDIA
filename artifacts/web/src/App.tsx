@@ -10,6 +10,7 @@ import { Layout } from "@/components/layout";
 // Pages
 import Login from "@/pages/login";
 import Register from "@/pages/register";
+import Dashboard from "@/pages/dashboard";
 import Chamada from "@/pages/chamada";
 import Diario from "@/pages/diario";
 import Atividades from "@/pages/atividades";
@@ -33,7 +34,7 @@ function AuthRoute({ component: Component }: { component: React.ComponentType })
   const { user, isLoading } = useAuth();
   
   if (isLoading) return null;
-  if (user) return <Redirect to="/chamada" />;
+  if (user) return <Redirect to="/" />;
   
   return <Component />;
 }
@@ -47,7 +48,7 @@ function Router() {
         <Route path="/register"><AuthRoute component={Register} /></Route>
         
         {/* Protected routes */}
-        <Route path="/"><Redirect to="/chamada" /></Route>
+        <Route path="/"><ProtectedRoute component={Dashboard} /></Route>
         <Route path="/chamada"><ProtectedRoute component={Chamada} /></Route>
         <Route path="/diario"><ProtectedRoute component={Diario} /></Route>
         <Route path="/atividades"><ProtectedRoute component={Atividades} /></Route>

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "wouter";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, Teacher } from "@/hooks/use-auth";
 import { apiFetch } from "@/lib/api";
 import { GraduationCap, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -16,16 +16,17 @@ export default function Login() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const res = await apiFetch<{ token: string; teacher: any }>('/auth/login', {
+      const res = await apiFetch<{ token: string; teacher: Teacher }>('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
       login(res.token, res.teacher);
-      window.location.href = import.meta.env.BASE_URL + 'chamada';
-    } catch (err: any) {
+      window.location.href = import.meta.env.BASE_URL;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Tente novamente.";
       toast({
         title: "Erro ao entrar",
-        description: err.message,
+        description: message,
         variant: "destructive",
       });
     } finally {
