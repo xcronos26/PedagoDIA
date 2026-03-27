@@ -136,6 +136,8 @@ The mobile app is configured for EAS Build. The `artifacts/mobile/eas.json` has 
 
 ### Steps to build the APK
 
+> **Important**: All EAS commands must be run from inside the `artifacts/mobile` folder. Running them from the repo root will not work correctly.
+
 1. **Create a free account** at [expo.dev](https://expo.dev) if you don't have one.
 2. **Install EAS CLI** on your local machine:
    ```
@@ -150,12 +152,14 @@ The mobile app is configured for EAS Build. The `artifacts/mobile/eas.json` has 
    cd artifacts/mobile
    eas build:configure
    ```
-5. **Build the production APK**:
+5. **Build the production APK** (must be run from inside `artifacts/mobile`):
    ```
+   cd artifacts/mobile
    eas build --platform android --profile production
    ```
 6. Wait 10–20 minutes for the build to complete (runs in Expo's cloud).
 7. **Download the `.apk`** from your [Expo builds dashboard](https://expo.dev/builds) and install it on any Android device.
 
 > **Production domain**: `workspace--kukasnunes.replit.app`  
-> Verified via deployment logs — `/api/healthz` responds 200 and all API routes are active.
+> Verified via deployment logs — `/api/healthz` responds 200 and all API routes are active.  
+> The `eas.json` with all profiles lives at `artifacts/mobile/eas.json` (the root-level `eas.json` has been removed to avoid confusion).
