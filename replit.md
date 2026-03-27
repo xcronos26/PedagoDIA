@@ -129,3 +129,33 @@ Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHea
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+
+## Generating the Android APK (EAS Build)
+
+The mobile app is configured for EAS Build. The `artifacts/mobile/eas.json` has three profiles (`development`, `preview`, `production`) — all set to `buildType: "apk"` and all pre-configured with `EXPO_PUBLIC_DOMAIN=workspace--kukasnunes.replit.app` so the APK calls the live production API automatically.
+
+### Steps to build the APK
+
+1. **Create a free account** at [expo.dev](https://expo.dev) if you don't have one.
+2. **Install EAS CLI** on your local machine:
+   ```
+   npm install -g eas-cli
+   ```
+3. **Log in** to your Expo account:
+   ```
+   eas login
+   ```
+4. **Navigate to the mobile folder** and link the project to your Expo account (first time only):
+   ```
+   cd artifacts/mobile
+   eas build:configure
+   ```
+5. **Build the production APK**:
+   ```
+   eas build --platform android --profile production
+   ```
+6. Wait 10–20 minutes for the build to complete (runs in Expo's cloud).
+7. **Download the `.apk`** from your [Expo builds dashboard](https://expo.dev/builds) and install it on any Android device.
+
+> **Production domain**: `workspace--kukasnunes.replit.app`  
+> Verified via deployment logs — `/api/healthz` responds 200 and all API routes are active.
