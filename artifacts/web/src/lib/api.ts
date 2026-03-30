@@ -1,5 +1,5 @@
 // Core API fetch wrapper that handles Auth tokens and 401s
-export const API_BASE = '/api';
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://responsive-website-builder--kukasnunes.replit.app/api';
 
 export async function apiFetch<T = any>(
   path: string,

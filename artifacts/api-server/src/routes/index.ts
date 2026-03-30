@@ -6,6 +6,7 @@ import studentsRouter from "./students";
 import attendanceRouter from "./attendance";
 import activitiesRouter from "./activities";
 import deliveriesRouter from "./deliveries";
+import parentReportsRouter from "./parent-reports";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(studentsRouter);
 router.use(attendanceRouter);
 router.use(activitiesRouter);
 router.use(deliveriesRouter);
+router.use(parentReportsRouter);
 
 export default router;

@@ -6,6 +6,8 @@ export const studentsTable = pgTable("students", {
   id: text("id").primaryKey(),
   teacherId: text("teacher_id").notNull(),
   name: text("name").notNull(),
+  parentAccessToken: text("parent_access_token"),
+  parentTokenExpires: timestamp("parent_token_expires"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

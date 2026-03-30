@@ -86,7 +86,7 @@ function ActivityCard({ activity, onEdit }: { activity: Activity; onEdit: (a: Ac
               <a 
                 href={activity.link} 
                 target="_blank" 
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 onClick={e => e.stopPropagation()}
                 className="p-2 text-primary bg-primary/10 rounded-lg hover:bg-primary hover:text-white transition-colors"
                 title="Acessar Link"
@@ -115,42 +115,97 @@ function ActivityCard({ activity, onEdit }: { activity: Activity; onEdit: (a: Ac
         </div>
       </div>
 
-      {/* Expanded Student List */}
+      {/* Expanded Content */}
       <div className={cn(
         "grid transition-all duration-300 ease-in-out",
         isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
       )}>
         <div className="overflow-hidden border-t border-border/30 bg-muted/5">
-          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {students?.map(student => {
-              const delivery = deliveries?.find(d => d.studentId === student.id);
-              const isDelivered = delivery?.delivered === true;
+          {/* Activity Details */}
+          <div className="p-4 border-b border-border/20 bg-card">
+            <h4 className="font-bold text-foreground mb-3 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-primary" />
+              Detalhes da Atividade
+            </h4>
+            
+            {activity.description && (
+              <div className="mb-3">
+                <p className="text-sm font-bold text-muted-foreground mb-1">Descrição:</p>
+                <p className="text-sm text-foreground bg-background p-3 rounded-lg border border-border/50">
+                  {activity.description}
+                </p>
+              </div>
+            )}
+            
+            {activity.link && (
+              <div className="mb-3">
+                <p className="text-sm font-bold text-muted-foreground mb-1">Link da atividade:</p>
+                <div className="flex items-center gap-2">
+                  <a 
+                    href={activity.link} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex-1 text-sm text-primary bg-primary/5 p-3 rounded-lg border border-primary/20 hover:bg-primary/10 transition-colors flex items-center gap-2 group"
+                  >
+                    <LinkIcon className="w-4 h-4 flex-shrink-0" />
+                    <span className="truncate">{activity.link}</span>
+                    <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                      (abrir em nova aba)
+                    </span>
+                  </a>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <CalendarIcon className="w-4 h-4" />
+                <span>{format(new Date(activity.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Book className="w-4 h-4" />
+                <span>{activity.type === 'homework' ? 'Tarefa de casa' : 'Atividade em sala'}</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Student List */}
+          <div className="p-4">
+            <h4 className="font-bold text-foreground mb-3 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-success" />
+              Entregas ({deliveredCount}/{totalCount})
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {students?.map(student => {
+                const delivery = deliveries?.find(d => d.studentId === student.id);
+                const isDelivered = delivery?.delivered === true;
 
-              return (
-                <button
-                  key={student.id}
-                  onClick={() => handleToggle(student.id, isDelivered)}
-                  className={cn(
-                    "flex items-center justify-between p-3 rounded-xl border transition-all text-left group",
-                    isDelivered 
-                      ? "bg-success/10 border-success/30 hover:border-success/50" 
-                      : "bg-background border-border/50 hover:border-primary/50 hover:bg-card"
-                  )}
-                >
-                  <span className={cn(
-                    "font-semibold truncate pr-3",
-                    isDelivered ? "text-success-foreground" : "text-foreground group-hover:text-primary"
-                  )}>
-                    {student.name}
-                  </span>
-                  {isDelivered ? (
-                    <CheckCircle2 className="w-6 h-6 text-success shrink-0" />
-                  ) : (
-                    <Circle className="w-6 h-6 text-muted-foreground/40 group-hover:text-primary/40 shrink-0" />
-                  )}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={student.id}
+                    onClick={() => handleToggle(student.id, isDelivered)}
+                    className={cn(
+                      "flex items-center justify-between p-3 rounded-xl border transition-all text-left group",
+                      isDelivered 
+                        ? "bg-success/10 border-success/30 hover:border-success/50" 
+                        : "bg-background border-border/50 hover:border-primary/50 hover:bg-card"
+                    )}
+                  >
+                    <span className={cn(
+                      "font-semibold truncate pr-3",
+                      isDelivered ? "text-success-foreground" : "text-foreground group-hover:text-primary"
+                    )}>
+                      {student.name}
+                    </span>
+                    {isDelivered ? (
+                      <CheckCircle2 className="w-6 h-6 text-success shrink-0" />
+                    ) : (
+                      <Circle className="w-6 h-6 text-muted-foreground/40 group-hover:text-primary/40 shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

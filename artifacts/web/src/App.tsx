@@ -15,6 +15,7 @@ import Chamada from "@/pages/chamada";
 import Diario from "@/pages/diario";
 import Atividades from "@/pages/atividades";
 import Relatorios from "@/pages/relatorios";
+import RelatorioCompartilhado from "@/pages/relatorio-compartilhado";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -41,22 +42,32 @@ function AuthRoute({ component: Component }: { component: React.ComponentType })
 
 function Router() {
   return (
-    <Layout>
+    <>
+      {/* Public route for shared reports - outside of protected layout */}
       <Switch>
-        {/* Auth routes */}
-        <Route path="/login"><AuthRoute component={Login} /></Route>
-        <Route path="/register"><AuthRoute component={Register} /></Route>
-        
-        {/* Protected routes */}
-        <Route path="/"><ProtectedRoute component={Dashboard} /></Route>
-        <Route path="/chamada"><ProtectedRoute component={Chamada} /></Route>
-        <Route path="/diario"><ProtectedRoute component={Diario} /></Route>
-        <Route path="/atividades"><ProtectedRoute component={Atividades} /></Route>
-        <Route path="/relatorios"><ProtectedRoute component={Relatorios} /></Route>
-        
-        <Route component={NotFound} />
+        <Route path="/relatorio/:token">
+          <RelatorioCompartilhado />
+        </Route>
       </Switch>
-    </Layout>
+      
+      {/* Protected routes with layout */}
+      <Layout>
+        <Switch>
+          {/* Auth routes */}
+          <Route path="/login"><AuthRoute component={Login} /></Route>
+          <Route path="/register"><AuthRoute component={Register} /></Route>
+          
+          {/* Protected routes */}
+          <Route path="/"><ProtectedRoute component={Dashboard} /></Route>
+          <Route path="/chamada"><ProtectedRoute component={Chamada} /></Route>
+          <Route path="/diario"><ProtectedRoute component={Diario} /></Route>
+          <Route path="/atividades"><ProtectedRoute component={Atividades} /></Route>
+          <Route path="/relatorios"><ProtectedRoute component={Relatorios} /></Route>
+          
+          <Route component={NotFound} />
+        </Switch>
+      </Layout>
+    </>
   );
 }
 
