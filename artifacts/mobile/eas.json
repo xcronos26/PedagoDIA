@@ -13,7 +13,7 @@
       "node": "20.18.0",
       "pnpm": "10.26.1",
       "env": {
-        "EXPO_PUBLIC_DOMAIN": "workspace--kukasnunes.replit.app"
+        "EXPO_PUBLIC_DOMAIN": "responsive-website-builder--kukasnunes.replit.app"
       }
     },
     "preview": {
@@ -24,7 +24,7 @@
       "node": "20.18.0",
       "pnpm": "10.26.1",
       "env": {
-        "EXPO_PUBLIC_DOMAIN": "workspace--kukasnunes.replit.app"
+        "EXPO_PUBLIC_DOMAIN": "responsive-website-builder--kukasnunes.replit.app"
       }
     },
     "production": {
@@ -34,7 +34,7 @@
       "node": "20.18.0",
       "pnpm": "10.26.1",
       "env": {
-        "EXPO_PUBLIC_DOMAIN": "workspace--kukasnunes.replit.app"
+        "EXPO_PUBLIC_DOMAIN": "responsive-website-builder--kukasnunes.replit.app"
       }
     }
   },
