@@ -30,8 +30,8 @@ function ActivityCard({ activity, onPress, onLongPress }: {
   onLongPress: () => void;
 }) {
   const isHomework = activity.type === 'homework';
-  const bgColor = isHomework ? Colors.homeworkLight : Colors.classworkLight;
-  const accentColor = isHomework ? Colors.homework : Colors.classwork;
+  const bgColor = isHomework ? '#FFEDD5' : '#DBEAFE';
+  const accentColor = isHomework ? '#C2410C' : '#1D4ED8';
 
   function formatDate(dateStr: string) {
     const [year, month, day] = dateStr.split('-');

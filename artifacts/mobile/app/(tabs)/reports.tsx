@@ -10,6 +10,8 @@ import {
   Modal,
   TextInput,
   KeyboardAvoidingView,
+  Linking,
+  Alert,
 } from 'react-native';
 import { DataLoadingWrapper } from '@/components/DataLoadingWrapper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -63,11 +65,12 @@ type SubjectGroup = {
   seen: number;
 };
 
-function SubjectGroupRow({ group, expanded, onToggle, deliveries }: {
+function SubjectGroupRow({ group, expanded, onToggle, deliveries, onActivityPress }: {
   group: SubjectGroup;
   expanded: boolean;
   onToggle: () => void;
   deliveries: { activityId: string; delivered: boolean; seen: boolean }[];
+  onActivityPress: (activity: Activity, delivered: boolean, seen: boolean) => void;
 }) {
   return (
     <View style={styles.subjectGroup}>
@@ -75,13 +78,13 @@ function SubjectGroupRow({ group, expanded, onToggle, deliveries }: {
         <View style={styles.subjectGroupLeft}>
           <Text style={styles.subjectGroupName}>{group.subject}</Text>
           <View style={styles.subjectGroupStats}>
-            <View style={[styles.miniStat, { backgroundColor: Colors.successLight }]}>
-              <Text style={[styles.miniStatText, { color: Colors.success }]}>{group.delivered}</Text>
-              <Text style={styles.miniStatLabel}>entregues</Text>
+            <View style={[styles.miniStat, { backgroundColor: '#DCFCE7' }]}>
+              <Text style={[styles.miniStatText, { color: '#166534' }]}>{group.delivered}</Text>
+              <Text style={[styles.miniStatLabel, { color: '#166534' }]}>entregues</Text>
             </View>
-            <View style={[styles.miniStat, { backgroundColor: Colors.primaryLight }]}>
-              <Text style={[styles.miniStatText, { color: Colors.primary }]}>{group.seen}</Text>
-              <Text style={styles.miniStatLabel}>vistos</Text>
+            <View style={[styles.miniStat, { backgroundColor: '#DBEAFE' }]}>
+              <Text style={[styles.miniStatText, { color: '#1D4ED8' }]}>{group.seen}</Text>
+              <Text style={[styles.miniStatLabel, { color: '#1D4ED8' }]}>vistos</Text>
             </View>
             <View style={[styles.miniStat, { backgroundColor: Colors.surfaceSecondary }]}>
               <Text style={[styles.miniStatText, { color: Colors.text }]}>{group.activities.length}</Text>
@@ -97,31 +100,37 @@ function SubjectGroupRow({ group, expanded, onToggle, deliveries }: {
         const seen = rec?.seen ?? false;
         const [, m, d] = activity.date.split('-');
         return (
-          <View key={activity.id} style={styles.activitySubRow}>
+          <TouchableOpacity
+            key={activity.id}
+            style={styles.activitySubRow}
+            onPress={() => onActivityPress(activity, delivered, seen)}
+            activeOpacity={0.72}
+          >
             <View style={{ flex: 1 }}>
               <Text style={styles.activitySubName} numberOfLines={1}>{activity.description}</Text>
               <Text style={styles.activitySubDate}>{d}/{m} · {activity.type === 'homework' ? 'Para casa' : 'Em sala'}</Text>
             </View>
             <View style={styles.activitySubBadges}>
               {delivered ? (
-                <View style={[styles.smallBadge, { backgroundColor: Colors.successLight }]}>
-                  <Ionicons name="checkmark" size={11} color={Colors.success} />
-                  <Text style={[styles.smallBadgeText, { color: Colors.success }]}>Entregue</Text>
+                <View style={[styles.smallBadge, { backgroundColor: '#DCFCE7' }]}>
+                  <Ionicons name="checkmark" size={11} color='#166534' />
+                  <Text style={[styles.smallBadgeText, { color: '#166534' }]}>Entregue</Text>
                 </View>
               ) : (
-                <View style={[styles.smallBadge, { backgroundColor: Colors.dangerLight }]}>
-                  <Ionicons name="close" size={11} color={Colors.danger} />
-                  <Text style={[styles.smallBadgeText, { color: Colors.danger }]}>Pendente</Text>
+                <View style={[styles.smallBadge, { backgroundColor: '#FEE2E2' }]}>
+                  <Ionicons name="close" size={11} color='#991B1B' />
+                  <Text style={[styles.smallBadgeText, { color: '#991B1B' }]}>Pendente</Text>
                 </View>
               )}
               {seen ? (
-                <View style={[styles.smallBadge, { backgroundColor: Colors.primaryLight }]}>
-                  <Ionicons name="eye" size={11} color={Colors.primary} />
-                  <Text style={[styles.smallBadgeText, { color: Colors.primary }]}>Visto</Text>
+                <View style={[styles.smallBadge, { backgroundColor: '#DBEAFE' }]}>
+                  <Ionicons name="eye" size={11} color='#1D4ED8' />
+                  <Text style={[styles.smallBadgeText, { color: '#1D4ED8' }]}>Visto</Text>
                 </View>
               ) : null}
             </View>
-          </View>
+            <Ionicons name="chevron-forward" size={13} color={Colors.textTertiary} style={{ marginLeft: 2 }} />
+          </TouchableOpacity>
         );
       })}
     </View>
@@ -138,6 +147,7 @@ export default function ReportsScreen() {
   const [activeTab, setActiveTab] = useState<'activities' | 'attendance'>('activities');
   const [justModal, setJustModal] = useState<JustificationModal>(null);
   const [editJustText, setEditJustText] = useState('');
+  const [activityModal, setActivityModal] = useState<{ activity: Activity; delivered: boolean; seen: boolean } | null>(null);
 
   const topPadding = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPadding = Platform.OS === 'web' ? 34 : 0;
@@ -253,6 +263,10 @@ export default function ReportsScreen() {
                   expanded={expandedSubjects.has(group.subject)}
                   onToggle={() => toggleSubject(group.subject)}
                   deliveries={studentDeliveries}
+                  onActivityPress={(activity, delivered, seen) => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setActivityModal({ activity, delivered, seen });
+                  }}
                 />
               ))
             )}
@@ -330,6 +344,105 @@ export default function ReportsScreen() {
             )}
           </ScrollView>
         )}
+
+      {/* Activity Detail Modal */}
+      {activityModal && (
+        <Modal visible={true} transparent animationType="slide">
+          <TouchableOpacity style={modalStyles.overlay} activeOpacity={1} onPress={() => setActivityModal(null)}>
+            <View style={[modalStyles.card, { paddingBottom: insets.bottom + 16 }]} onStartShouldSetResponder={() => true}>
+              <View style={modalStyles.handle} />
+              <View style={modalStyles.titleRow}>
+                <View style={[modalStyles.iconCircle, {
+                  backgroundColor: activityModal.activity.type === 'homework' ? '#FFEDD5' : '#DBEAFE',
+                }]}>
+                  <Ionicons
+                    name={activityModal.activity.type === 'homework' ? 'home-outline' : 'school-outline'}
+                    size={20}
+                    color={activityModal.activity.type === 'homework' ? '#C2410C' : '#1D4ED8'}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={modalStyles.title} numberOfLines={2}>{activityModal.activity.description}</Text>
+                  <View style={{ flexDirection: 'row', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                    <View style={[styles.smallBadge, {
+                      backgroundColor: activityModal.activity.type === 'homework' ? '#FFEDD5' : '#DBEAFE',
+                    }]}>
+                      <Text style={[styles.smallBadgeText, {
+                        color: activityModal.activity.type === 'homework' ? '#C2410C' : '#1D4ED8',
+                      }]}>
+                        {activityModal.activity.type === 'homework' ? 'Para casa' : 'Em sala'}
+                      </Text>
+                    </View>
+                    <View style={[styles.smallBadge, { backgroundColor: Colors.surfaceSecondary }]}>
+                      <Text style={[styles.smallBadgeText, { color: Colors.textSecondary }]}>{activityModal.activity.subject}</Text>
+                    </View>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => setActivityModal(null)}>
+                  <Ionicons name="close" size={24} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.surfaceSecondary, borderRadius: 12, padding: 12 }}>
+                <Ionicons name="calendar-outline" size={16} color={Colors.textSecondary} />
+                <Text style={{ fontSize: 14, fontFamily: 'Inter_400Regular', color: Colors.textSecondary }}>
+                  {(() => { const [y, m, d] = activityModal.activity.date.split('-'); return `${d}/${m}/${y}`; })()}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={[styles.smallBadge, {
+                  backgroundColor: activityModal.delivered ? '#DCFCE7' : '#FEE2E2',
+                  flex: 1, justifyContent: 'center', paddingVertical: 10,
+                }]}>
+                  <Ionicons
+                    name={activityModal.delivered ? 'checkmark-circle' : 'close-circle'}
+                    size={16}
+                    color={activityModal.delivered ? '#166534' : '#991B1B'}
+                  />
+                  <Text style={[styles.smallBadgeText, {
+                    color: activityModal.delivered ? '#166534' : '#991B1B', fontSize: 13,
+                  }]}>
+                    {activityModal.delivered ? 'Entregue' : 'Pendente'}
+                  </Text>
+                </View>
+                {activityModal.seen && (
+                  <View style={[styles.smallBadge, { backgroundColor: '#DBEAFE', paddingVertical: 10 }]}>
+                    <Ionicons name="eye" size={16} color='#1D4ED8' />
+                    <Text style={[styles.smallBadgeText, { color: '#1D4ED8', fontSize: 13 }]}>Visto</Text>
+                  </View>
+                )}
+              </View>
+
+              {activityModal.activity.link ? (
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.primaryLight, padding: 14, borderRadius: 12 }}
+                  onPress={async () => {
+                    let url = activityModal.activity.link!.trim();
+                    if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
+                    const supported = await Linking.canOpenURL(url);
+                    if (supported) {
+                      Linking.openURL(url);
+                    } else {
+                      Alert.alert('Link inválido', 'Não foi possível abrir este link.');
+                    }
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Feather name="external-link" size={16} color={Colors.primary} />
+                  <Text style={{ flex: 1, fontSize: 14, fontFamily: 'Inter_500Medium', color: Colors.primary }} numberOfLines={1}>
+                    {activityModal.activity.link}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+
+              <TouchableOpacity style={modalStyles.closeBtn} onPress={() => setActivityModal(null)} activeOpacity={0.8}>
+                <Text style={modalStyles.closeBtnText}>Fechar</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
 
       {/* Justification Full-View / Edit Modal */}
       <Modal visible={!!justModal} transparent animationType="slide">
