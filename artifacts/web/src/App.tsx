@@ -42,32 +42,30 @@ function AuthRoute({ component: Component }: { component: React.ComponentType })
 
 function Router() {
   return (
-    <>
+    <Switch>
       {/* Public route for shared reports - outside of protected layout */}
-      <Switch>
-        <Route path="/relatorio/:token">
-          <RelatorioCompartilhado />
-        </Route>
-      </Switch>
+      <Route path="/relatorio/:token">
+        <RelatorioCompartilhado />
+      </Route>
+      
+      {/* Auth routes */}
+      <Route path="/login"><AuthRoute component={Login} /></Route>
+      <Route path="/register"><AuthRoute component={Register} /></Route>
       
       {/* Protected routes with layout */}
-      <Layout>
-        <Switch>
-          {/* Auth routes */}
-          <Route path="/login"><AuthRoute component={Login} /></Route>
-          <Route path="/register"><AuthRoute component={Register} /></Route>
-          
-          {/* Protected routes */}
-          <Route path="/"><ProtectedRoute component={Dashboard} /></Route>
-          <Route path="/chamada"><ProtectedRoute component={Chamada} /></Route>
-          <Route path="/diario"><ProtectedRoute component={Diario} /></Route>
-          <Route path="/atividades"><ProtectedRoute component={Atividades} /></Route>
-          <Route path="/relatorios"><ProtectedRoute component={Relatorios} /></Route>
-          
-          <Route component={NotFound} />
-        </Switch>
-      </Layout>
-    </>
+      <Route path="/:rest*">
+        <Layout>
+          <Switch>
+            <Route path="/" component={Dashboard} />
+            <Route path="/chamada" component={Chamada} />
+            <Route path="/diario" component={Diario} />
+            <Route path="/atividades" component={Atividades} />
+            <Route path="/relatorios" component={Relatorios} />
+            <Route component={NotFound} />
+          </Switch>
+        </Layout>
+      </Route>
+    </Switch>
   );
 }
 
