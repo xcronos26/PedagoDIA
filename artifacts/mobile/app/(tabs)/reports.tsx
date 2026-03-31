@@ -12,6 +12,8 @@ import {
   KeyboardAvoidingView,
   Linking,
   Alert,
+  Share,
+  ActivityIndicator,
 } from 'react-native';
 import { DataLoadingWrapper } from '@/components/DataLoadingWrapper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +21,8 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/colors';
 import { useApp, Student, Activity, AttendanceRecord } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
+import { apiFetch } from '@/utils/api';
 
 function getLast30Days() {
   const days: string[] = [];
@@ -141,6 +145,7 @@ type JustificationModal = { rec: AttendanceRecord; date: string; mode: 'view' | 
 
 export default function ReportsScreen() {
   const insets = useSafeAreaInsets();
+  const { token } = useAuth();
   const { students, activities, attendance, getDeliveriesForStudent, justifyAbsence, isLoaded, loadError, loadData } = useApp();
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
@@ -148,6 +153,28 @@ export default function ReportsScreen() {
   const [justModal, setJustModal] = useState<JustificationModal>(null);
   const [editJustText, setEditJustText] = useState('');
   const [activityModal, setActivityModal] = useState<{ activity: Activity; delivered: boolean; seen: boolean } | null>(null);
+  const [sharingLink, setSharingLink] = useState(false);
+
+  const handleShareParentReport = async () => {
+    if (!selectedStudent || !token) return;
+    try {
+      setSharingLink(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      const data = await apiFetch<{ url: string; expiresAt: string }>(`/students/${selectedStudent.id}/generate-parent-token`, {
+        method: 'POST',
+        token,
+      });
+      await Share.share({
+        title: `Relatório de ${selectedStudent.name}`,
+        message: `Relatório escolar de ${selectedStudent.name}: ${data.url}`,
+        url: data.url,
+      });
+    } catch (err: any) {
+      Alert.alert('Erro', err?.message || 'Não foi possível gerar o link de partilha.');
+    } finally {
+      setSharingLink(false);
+    }
+  };
 
   const topPadding = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPadding = Platform.OS === 'web' ? 34 : 0;
@@ -205,6 +232,17 @@ export default function ReportsScreen() {
             <Text style={styles.headerTitle} numberOfLines={1}>{selectedStudent.name}</Text>
             <Text style={styles.headerSub}>Relatório completo</Text>
           </View>
+          <TouchableOpacity
+            style={styles.shareBtn}
+            onPress={handleShareParentReport}
+            activeOpacity={0.8}
+            disabled={sharingLink}
+          >
+            {sharingLink
+              ? <ActivityIndicator size={18} color={Colors.primary} />
+              : <Ionicons name="share-outline" size={22} color={Colors.primary} />
+            }
+          </TouchableOpacity>
         </View>
 
         {/* Tab Switcher */}
@@ -572,6 +610,10 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: Colors.border,
+  },
+  shareBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center',
   },
   headerMid: { flex: 1 },
   headerTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', color: Colors.text, letterSpacing: -0.5 },
