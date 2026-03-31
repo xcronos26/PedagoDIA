@@ -16,6 +16,13 @@ router.get("/student-reports", requireAuth, async (req, res) => {
       res.status(400).json({ error: "studentId é obrigatório" });
       return;
     }
+    const [student] = await db.select({ id: studentsTable.id })
+      .from(studentsTable)
+      .where(and(eq(studentsTable.id, studentId), eq(studentsTable.teacherId, req.teacherId!)));
+    if (!student) {
+      res.status(403).json({ error: "Aluno não encontrado ou não pertence ao professor" });
+      return;
+    }
     const reports = await db.select()
       .from(studentReportsTable)
       .where(and(

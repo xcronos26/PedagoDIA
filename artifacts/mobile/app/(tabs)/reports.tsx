@@ -186,7 +186,10 @@ export default function ReportsScreen() {
 
   const handleSaveReport = async () => {
     if (!selectedStudent || !token || !newReportContent.trim()) return;
-    const reportDate = newReportDateObj.toISOString().split('T')[0];
+    const y = newReportDateObj.getFullYear();
+    const m = String(newReportDateObj.getMonth() + 1).padStart(2, '0');
+    const d = String(newReportDateObj.getDate()).padStart(2, '0');
+    const reportDate = `${y}-${m}-${d}`;
     setSavingReport(true);
     try {
       await apiFetch('/student-reports', {
