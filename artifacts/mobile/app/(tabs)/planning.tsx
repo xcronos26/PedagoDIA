@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,6 @@ import {
   Platform,
   KeyboardAvoidingView,
   ActivityIndicator,
-  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,12 +19,13 @@ import { Colors } from '@/constants/colors';
 import { useAuth } from '@/context/AuthContext';
 import { useApp, Activity } from '@/context/AppContext';
 import { apiFetch } from '@/utils/api';
-import { toISO, getBrasiliaDate, formatBR } from '@/utils/date';
+import { toISO, getBrasiliaDate } from '@/utils/date';
 
-const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-const SCREEN_PADDING = 24;
-const CELL_SIZE = Math.floor((Dimensions.get('window').width - SCREEN_PADDING) / 7);
-const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const MONTH_NAMES = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+];
+const WEEKDAY_PT = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'];
 
 type LessonPlan = {
   id: string;
@@ -34,24 +34,23 @@ type LessonPlan = {
   activityIds: string[];
 };
 
-function getMonthISO(year: number, month: number): string {
-  return `${year}-${String(month + 1).padStart(2, '0')}`;
+function getMonday(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(12, 0, 0, 0);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
 }
 
-function getDaysInMonth(year: number, month: number): (string | null)[] {
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells: (string | null)[] = [];
-  for (let i = 0; i < firstDay; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push(`${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
-  }
-  while (cells.length % 7 !== 0) cells.push(null);
-  return cells;
+function addDays(date: Date, n: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
 }
 
-function getTodayISO(): string {
-  return toISO(getBrasiliaDate());
+function getWeekDays(monday: Date): Date[] {
+  return Array.from({ length: 5 }, (_, i) => addDays(monday, i));
 }
 
 export default function PlanningScreen() {
@@ -61,38 +60,46 @@ export default function PlanningScreen() {
   const topPadding = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPadding = Platform.OS === 'web' ? 34 : 0;
 
-  const today = useMemo(() => new Date(getBrasiliaDate()), []);
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth());
+  const [monday, setMonday] = useState(() => getMonday(getBrasiliaDate()));
+  const weekDays = useMemo(() => getWeekDays(monday), [monday]);
 
   const [plans, setPlans] = useState<LessonPlan[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [description, setDescription] = useState('');
-  const [saving, setSaving] = useState(false);
+
+  const [activeDayDate, setActiveDayDate] = useState<string | null>(null);
   const [linkModal, setLinkModal] = useState(false);
   const [createModal, setCreateModal] = useState(false);
   const [newAct, setNewAct] = useState({ description: '', type: 'homework' as 'homework' | 'classwork', subject: '' });
   const [creatingAct, setCreatingAct] = useState(false);
 
-  const monthStr = getMonthISO(year, month);
-  const todayISO = useMemo(() => getTodayISO(), []);
+  const [descEdits, setDescEdits] = useState<Record<string, string>>({});
+  const [savingDesc, setSavingDesc] = useState<Record<string, boolean>>({});
+  const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const mondayISO = toISO(monday);
 
   const fetchPlans = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
-      const data = await apiFetch<LessonPlan[]>(`/lesson-plans?month=${monthStr}`, { token });
-      setPlans(data);
-    } catch (err: any) {
-      console.error('Error fetching lesson plans:', err);
+      const months = new Set<string>();
+      getWeekDays(monday).forEach(d => {
+        months.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+      });
+      const results = await Promise.all(
+        Array.from(months).map(m => apiFetch<LessonPlan[]>(`/lesson-plans?month=${m}`, { token }))
+      );
+      setPlans(results.flat());
+    } catch {
+      // silent
     } finally {
       setLoading(false);
     }
-  }, [monthStr, token]);
+  }, [token, mondayISO]);
 
   useEffect(() => {
     fetchPlans();
+    setDescEdits({});
   }, [fetchPlans]);
 
   const plansByDate = useMemo(() => {
@@ -101,67 +108,71 @@ export default function PlanningScreen() {
     return map;
   }, [plans]);
 
-  const selectedPlan = selectedDate ? plansByDate[selectedDate] : null;
-
-  useEffect(() => {
-    setDescription(selectedPlan?.description ?? '');
-  }, [selectedDate, selectedPlan?.id]);
-
-  const cells = useMemo(() => getDaysInMonth(year, month), [year, month]);
-
+  const goToPrevWeek = () => setMonday(m => addDays(m, -7));
+  const goToNextWeek = () => setMonday(m => addDays(m, 7));
   const goToPrevMonth = () => {
-    setSelectedDate(null);
-    if (month === 0) { setYear(y => y - 1); setMonth(11); }
-    else setMonth(m => m - 1);
+    const d = new Date(monday);
+    d.setMonth(d.getMonth() - 1);
+    setMonday(getMonday(d));
   };
-
   const goToNextMonth = () => {
-    setSelectedDate(null);
-    if (month === 11) { setYear(y => y + 1); setMonth(0); }
-    else setMonth(m => m + 1);
+    const d = new Date(monday);
+    d.setMonth(d.getMonth() + 1);
+    setMonday(getMonday(d));
   };
 
-  const handleSave = async () => {
-    if (!selectedDate || !token) return;
-    setSaving(true);
+  const getDescValue = (dateStr: string): string => {
+    if (descEdits[dateStr] !== undefined) return descEdits[dateStr];
+    return plansByDate[dateStr]?.description ?? '';
+  };
+
+  const handleDescChange = (dateStr: string, text: string) => {
+    setDescEdits(prev => ({ ...prev, [dateStr]: text }));
+    if (debounceTimers.current[dateStr]) clearTimeout(debounceTimers.current[dateStr]);
+    debounceTimers.current[dateStr] = setTimeout(() => saveDescription(dateStr, text), 1500);
+  };
+
+  const saveDescription = async (dateStr: string, text: string) => {
+    if (!token) return;
+    setSavingDesc(prev => ({ ...prev, [dateStr]: true }));
     try {
       const data = await apiFetch<LessonPlan>('/lesson-plans', {
         method: 'POST',
         token,
-        body: JSON.stringify({ date: selectedDate, description }),
+        body: JSON.stringify({ date: dateStr, description: text }),
       });
       setPlans(prev => {
-        const filtered = prev.filter(p => p.date !== selectedDate);
+        const filtered = prev.filter(p => p.date !== dateStr);
         return [...filtered, data];
       });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
-      Alert.alert('Erro', 'Não foi possível salvar o planejamento.');
+      // silent auto-save failure
     } finally {
-      setSaving(false);
+      setSavingDesc(prev => ({ ...prev, [dateStr]: false }));
+    }
+  };
+
+  const ensurePlan = async (dateStr: string): Promise<string | null> => {
+    const existing = plansByDate[dateStr];
+    if (existing) return existing.id;
+    if (!token) return null;
+    try {
+      const data = await apiFetch<LessonPlan>('/lesson-plans', {
+        method: 'POST',
+        token,
+        body: JSON.stringify({ date: dateStr, description: getDescValue(dateStr) }),
+      });
+      setPlans(prev => [...prev.filter(p => p.date !== dateStr), data]);
+      return data.id;
+    } catch {
+      return null;
     }
   };
 
   const handleLinkActivity = async (activityId: string) => {
-    if (!selectedDate || !token) return;
-    let planId = selectedPlan?.id;
-    if (!planId) {
-      try {
-        const data = await apiFetch<LessonPlan>('/lesson-plans', {
-          method: 'POST',
-          token,
-          body: JSON.stringify({ date: selectedDate, description }),
-        });
-        planId = data.id;
-        setPlans(prev => {
-          const filtered = prev.filter(p => p.date !== selectedDate);
-          return [...filtered, data];
-        });
-      } catch {
-        Alert.alert('Erro', 'Não foi possível criar o planejamento.');
-        return;
-      }
-    }
+    if (!activeDayDate || !token) return;
+    const planId = await ensurePlan(activeDayDate);
+    if (!planId) { Alert.alert('Erro', 'Não foi possível criar o planejamento.'); return; }
     try {
       await apiFetch(`/lesson-plans/${planId}/activities`, {
         method: 'POST',
@@ -179,39 +190,34 @@ export default function PlanningScreen() {
     }
   };
 
-  const handleUnlinkActivity = async (activityId: string) => {
-    if (!selectedPlan || !token) return;
+  const handleUnlink = async (dateStr: string, activityId: string) => {
+    const plan = plansByDate[dateStr];
+    if (!plan || !token) return;
     try {
-      await apiFetch(`/lesson-plans/${selectedPlan.id}/activities/${activityId}`, {
-        method: 'DELETE',
-        token,
-      });
-      setPlans(prev => prev.map(p => p.id === selectedPlan.id
+      await apiFetch(`/lesson-plans/${plan.id}/activities/${activityId}`, { method: 'DELETE', token });
+      setPlans(prev => prev.map(p => p.id === plan.id
         ? { ...p, activityIds: p.activityIds.filter(id => id !== activityId) }
         : p
       ));
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {
-      Alert.alert('Erro', 'Não foi possível desassociar a atividade.');
+      Alert.alert('Erro', 'Não foi possível desassociar.');
     }
   };
 
   const handleCreateAndLink = async () => {
-    if (!selectedDate || !newAct.description.trim() || !token) return;
+    if (!activeDayDate || !newAct.description.trim() || !token) return;
     setCreatingAct(true);
     try {
-      const createdActivity = await addActivity({
+      const created = await addActivity({
         subject: newAct.subject || (activities[0]?.subject ?? 'Geral'),
         type: newAct.type,
         description: newAct.description,
-        date: selectedDate,
+        date: activeDayDate,
       });
-      if (createdActivity) {
-        await handleLinkActivity(createdActivity.id);
-      }
+      if (created) await handleLinkActivity(created.id);
       setCreateModal(false);
       setNewAct({ description: '', type: 'homework', subject: '' });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
       Alert.alert('Erro', 'Não foi possível criar a atividade.');
     } finally {
@@ -219,466 +225,401 @@ export default function PlanningScreen() {
     }
   };
 
-  const linkedActivities = useMemo(() => {
-    if (!selectedPlan) return [];
-    return selectedPlan.activityIds.map(id => activities.find(a => a.id === id)).filter(Boolean) as Activity[];
-  }, [selectedPlan, activities]);
+  const subjects = useMemo(() => Array.from(new Set(activities.map(a => a.subject))), [activities]);
+  const todayISO = useMemo(() => toISO(getBrasiliaDate()), []);
+  const displayMonth = monday.getMonth();
+  const displayYear = monday.getFullYear();
+  const mondayDay = monday.getDate();
+  const fridayDay = weekDays[4].getDate();
+  const weekLabel = `Semana ${mondayDay} — ${fridayDay}`;
+  const monthStr = `${displayYear}-${String(displayMonth + 1).padStart(2, '0')}`;
+  const monthPlansCount = plans.filter(p => p.date.startsWith(monthStr)).length;
 
   const availableToLink = useMemo(() => {
-    const linked = new Set(selectedPlan?.activityIds ?? []);
+    if (!activeDayDate) return activities;
+    const linked = new Set(plansByDate[activeDayDate]?.activityIds ?? []);
     return activities.filter(a => !linked.has(a.id));
-  }, [activities, selectedPlan]);
-
-  const subjects = useMemo(() => {
-    const set = new Set(activities.map(a => a.subject));
-    return Array.from(set);
-  }, [activities]);
-
-  if (selectedDate) {
-    return (
-      <View style={[styles.container, { paddingTop: topPadding }]}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => setSelectedDate(null)} activeOpacity={0.8}>
-            <Ionicons name="arrow-back" size={24} color={Colors.text} />
-          </TouchableOpacity>
-          <View style={styles.headerMid}>
-            <Text style={styles.headerTitle} numberOfLines={1}>{formatBR(selectedDate)}</Text>
-            <Text style={styles.headerSub}>Planejamento do dia</Text>
-          </View>
-        </View>
-
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPadding + 100, gap: 16 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-
-            {/* Description */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Descritivo da Aula</Text>
-              <TextInput
-                style={styles.descriptionInput}
-                value={description}
-                onChangeText={setDescription}
-                multiline
-                placeholder="Descreva os objetivos, conteúdos e metodologias previstas para este dia..."
-                placeholderTextColor={Colors.textTertiary}
-                textAlignVertical="top"
-              />
-              <TouchableOpacity
-                style={[styles.saveBtn, saving && { opacity: 0.6 }]}
-                onPress={handleSave}
-                disabled={saving}
-                activeOpacity={0.85}
-              >
-                {saving
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <><Ionicons name="checkmark" size={18} color="#fff" /><Text style={styles.saveBtnText}>Salvar</Text></>
-                }
-              </TouchableOpacity>
-            </View>
-
-            {/* Activities */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>Atividades do Dia</Text>
-              </View>
-              <View style={styles.actBtnRow}>
-                <TouchableOpacity style={styles.actBtn} onPress={() => setLinkModal(true)} activeOpacity={0.8}>
-                  <Ionicons name="link-outline" size={15} color={Colors.text} />
-                  <Text style={styles.actBtnText}>Associar existente</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.actBtn, styles.actBtnPrimary]} onPress={() => setCreateModal(true)} activeOpacity={0.8}>
-                  <Ionicons name="add" size={15} color={Colors.primary} />
-                  <Text style={[styles.actBtnText, { color: Colors.primary }]}>Nova atividade</Text>
-                </TouchableOpacity>
-              </View>
-
-              {linkedActivities.length === 0 ? (
-                <View style={styles.emptyActivities}>
-                  <Ionicons name="book-outline" size={32} color={Colors.textTertiary} />
-                  <Text style={styles.emptyActText}>Nenhuma atividade associada</Text>
-                </View>
-              ) : (
-                linkedActivities.map(activity => (
-                  <View key={activity.id} style={styles.activityRow}>
-                    <View style={[styles.typeDot, { backgroundColor: activity.type === 'homework' ? '#FFEDD5' : '#DBEAFE' }]}>
-                      <Text style={[styles.typeDotText, { color: activity.type === 'homework' ? '#C2410C' : '#1D4ED8' }]}>
-                        {activity.type === 'homework' ? 'Casa' : 'Sala'}
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.activitySubject} numberOfLines={1}>{activity.subject}</Text>
-                      <Text style={styles.activityDesc} numberOfLines={2}>{activity.description}</Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => handleUnlinkActivity(activity.id)}
-                      style={styles.unlinkBtn}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="close-circle-outline" size={20} color={Colors.danger} />
-                    </TouchableOpacity>
-                  </View>
-                ))
-              )}
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-
-        {/* Link Activity Modal */}
-        <Modal visible={linkModal} transparent animationType="slide">
-          <TouchableOpacity style={modalStyles.overlay} activeOpacity={1} onPress={() => setLinkModal(false)}>
-            <View style={[modalStyles.card, { paddingBottom: insets.bottom + 16 }]} onStartShouldSetResponder={() => true}>
-              <View style={modalStyles.handle} />
-              <Text style={modalStyles.title}>Associar atividade</Text>
-              <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled">
-                {availableToLink.length === 0 ? (
-                  <Text style={modalStyles.emptyText}>Nenhuma atividade disponível para associar.</Text>
-                ) : (
-                  availableToLink.map(a => (
-                    <TouchableOpacity key={a.id} style={modalStyles.actRow} onPress={() => handleLinkActivity(a.id)} activeOpacity={0.8}>
-                      <View style={[modalStyles.typePill, { backgroundColor: a.type === 'homework' ? '#FFEDD5' : '#DBEAFE' }]}>
-                        <Text style={[modalStyles.typePillText, { color: a.type === 'homework' ? '#C2410C' : '#1D4ED8' }]}>
-                          {a.type === 'homework' ? 'Casa' : 'Sala'}
-                        </Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={modalStyles.actSubject}>{a.subject}</Text>
-                        <Text style={modalStyles.actDesc} numberOfLines={1}>{a.description}</Text>
-                      </View>
-                      <Ionicons name="add-circle-outline" size={22} color={Colors.primary} />
-                    </TouchableOpacity>
-                  ))
-                )}
-              </ScrollView>
-              <TouchableOpacity style={modalStyles.cancelBtn} onPress={() => setLinkModal(false)} activeOpacity={0.8}>
-                <Text style={modalStyles.cancelText}>Fechar</Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        </Modal>
-
-        {/* Create Activity Modal */}
-        <Modal visible={createModal} transparent animationType="slide">
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-            <TouchableOpacity style={modalStyles.overlay} activeOpacity={1} onPress={() => setCreateModal(false)}>
-              <View style={[modalStyles.card, { paddingBottom: insets.bottom + 16 }]} onStartShouldSetResponder={() => true}>
-                <View style={modalStyles.handle} />
-                <Text style={modalStyles.title}>Nova atividade</Text>
-
-                {subjects.length > 0 && (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                      {subjects.map(sub => (
-                        <TouchableOpacity
-                          key={sub}
-                          style={[modalStyles.subjectChip, newAct.subject === sub && modalStyles.subjectChipActive]}
-                          onPress={() => setNewAct(a => ({ ...a, subject: sub }))}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={[modalStyles.subjectChipText, newAct.subject === sub && modalStyles.subjectChipActiveText]}>{sub}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </ScrollView>
-                )}
-
-                <View style={modalStyles.typeRow}>
-                  <TouchableOpacity
-                    style={[modalStyles.typeBtn, newAct.type === 'homework' && { borderColor: '#C2410C', backgroundColor: '#FFEDD5' }]}
-                    onPress={() => setNewAct(a => ({ ...a, type: 'homework' }))}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[modalStyles.typeBtnText, newAct.type === 'homework' && { color: '#C2410C' }]}>Para casa</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[modalStyles.typeBtn, newAct.type === 'classwork' && { borderColor: Colors.primary, backgroundColor: '#DBEAFE' }]}
-                    onPress={() => setNewAct(a => ({ ...a, type: 'classwork' }))}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[modalStyles.typeBtnText, newAct.type === 'classwork' && { color: Colors.primary }]}>Em sala</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <TextInput
-                  style={[modalStyles.input, { minHeight: 90, textAlignVertical: 'top' }]}
-                  placeholder="Descrição da atividade..."
-                  placeholderTextColor={Colors.textTertiary}
-                  value={newAct.description}
-                  onChangeText={t => setNewAct(a => ({ ...a, description: t }))}
-                  multiline
-                  autoFocus
-                />
-
-                <View style={modalStyles.buttons}>
-                  <TouchableOpacity style={modalStyles.cancelBtn} onPress={() => setCreateModal(false)} activeOpacity={0.8}>
-                    <Text style={modalStyles.cancelText}>Cancelar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[modalStyles.confirmBtn, (!newAct.description.trim() || creatingAct) && { opacity: 0.5 }]}
-                    onPress={handleCreateAndLink}
-                    disabled={!newAct.description.trim() || creatingAct}
-                    activeOpacity={0.85}
-                  >
-                    {creatingAct
-                      ? <ActivityIndicator size="small" color="#fff" />
-                      : <Text style={modalStyles.confirmText}>Criar e associar</Text>
-                    }
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </TouchableOpacity>
-          </KeyboardAvoidingView>
-        </Modal>
-      </View>
-    );
-  }
+  }, [activities, activeDayDate, plansByDate]);
 
   return (
     <View style={[styles.container, { paddingTop: topPadding }]}>
-      {/* Month navigation header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.navBtn} onPress={goToPrevMonth} activeOpacity={0.8}>
+      {/* Month Header */}
+      <View style={styles.monthHeader}>
+        <TouchableOpacity style={styles.iconBtn} onPress={goToPrevMonth} activeOpacity={0.8}>
           <Ionicons name="chevron-back" size={22} color={Colors.text} />
         </TouchableOpacity>
-        <View style={styles.headerMid}>
-          <Text style={styles.headerTitle}>{MONTH_NAMES[month]}</Text>
-          <Text style={styles.headerSub}>{year}</Text>
+        <View style={styles.monthCenter}>
+          <Text style={styles.monthTitle}>{MONTH_NAMES[displayMonth]} {displayYear}</Text>
+          {loading
+            ? <ActivityIndicator size="small" color={Colors.primary} style={{ marginTop: 2 }} />
+            : <Text style={styles.monthSub}>{monthPlansCount} dia(s) com planejamento</Text>
+          }
         </View>
-        <TouchableOpacity style={styles.navBtn} onPress={goToNextMonth} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.iconBtn} onPress={goToNextMonth} activeOpacity={0.8}>
           <Ionicons name="chevron-forward" size={22} color={Colors.text} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: bottomPadding + 100 }} showsVerticalScrollIndicator={false}>
-        {/* Day labels */}
-        <View style={styles.dayLabelRow}>
-          {DAY_LABELS.map(d => (
-            <Text key={d} style={styles.dayLabel}>{d}</Text>
-          ))}
-        </View>
+      {/* Week Navigation */}
+      <View style={styles.weekNav}>
+        <TouchableOpacity style={styles.weekArrow} onPress={goToPrevWeek} activeOpacity={0.8}>
+          <Ionicons name="chevron-back" size={18} color={Colors.textSecondary} />
+        </TouchableOpacity>
+        <Text style={styles.weekLabel}>{weekLabel}</Text>
+        <TouchableOpacity style={styles.weekArrow} onPress={goToNextWeek} activeOpacity={0.8}>
+          <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
 
-        {/* Calendar Grid */}
-        {loading ? (
-          <ActivityIndicator color={Colors.primary} style={{ marginTop: 40 }} />
-        ) : (
-          <View style={styles.calendarGrid}>
-            {cells.map((dateStr, i) => {
-              if (!dateStr) {
-                return <View key={`empty-${i}`} style={styles.dayCell} />;
-              }
-              const hasPlan = !!plansByDate[dateStr];
-              const isToday = dateStr === todayISO;
-              const [, , d] = dateStr.split('-');
+      {/* Day Cards */}
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomPadding + 110 }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {weekDays.map((day, idx) => {
+          const dateStr = toISO(day);
+          const plan = plansByDate[dateStr];
+          const desc = getDescValue(dateStr);
+          const isToday = dateStr === todayISO;
+          const dayName = WEEKDAY_PT[idx];
+          const dayNum = day.getDate();
+          const isSaving = savingDesc[dateStr];
+          const linkedActivities = plan
+            ? plan.activityIds.map(id => activities.find(a => a.id === id)).filter(Boolean) as Activity[]
+            : [];
 
-              return (
-                <TouchableOpacity
-                  key={dateStr}
-                  style={[
-                    styles.dayCell,
-                    isToday && styles.dayCellToday,
-                    hasPlan && !isToday && styles.dayCellHasPlan,
-                  ]}
-                  onPress={() => setSelectedDate(dateStr)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[
-                    styles.dayNum,
-                    isToday && styles.dayNumToday,
-                    hasPlan && !isToday && styles.dayNumHasPlan,
-                  ]}>
-                    {parseInt(d)}
+          return (
+            <View key={dateStr} style={[styles.card, isToday && styles.cardToday]}>
+              {/* Card header row */}
+              <View style={styles.cardHeader}>
+                <View style={styles.dayLabelWrap}>
+                  {isToday && <View style={styles.todayDot} />}
+                  <Text style={[styles.dayName, isToday && { color: Colors.primary }]}>
+                    {dayName} — {dayNum}
                   </Text>
-                  {hasPlan && (
-                    <View style={[styles.planDot, isToday && styles.planDotToday]} />
+                  {isSaving && (
+                    <ActivityIndicator size="small" color={Colors.primary} style={{ marginLeft: 6 }} />
                   )}
+                </View>
+                <TouchableOpacity
+                  style={styles.addBtn}
+                  onPress={() => { setActiveDayDate(dateStr); setLinkModal(true); }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="add" size={13} color={Colors.primary} />
+                  <Text style={styles.addBtnText}>Adicionar atividade</Text>
                 </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
+              </View>
 
-        {/* Legend */}
-        <View style={styles.legend}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: Colors.primary }]} />
-            <Text style={styles.legendText}>Com planejamento</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: Colors.primaryLight, borderWidth: 2, borderColor: Colors.primary }]} />
-            <Text style={styles.legendText}>Hoje</Text>
-          </View>
-        </View>
+              {/* Divider */}
+              <View style={styles.divider} />
+
+              {/* Description */}
+              <View style={styles.descBlock}>
+                <Text style={styles.sectionLabel}>descritivo</Text>
+                <TextInput
+                  style={styles.descInput}
+                  value={desc}
+                  onChangeText={text => handleDescChange(dateStr, text)}
+                  placeholder="nada planejado"
+                  placeholderTextColor={Colors.textTertiary}
+                  multiline
+                  textAlignVertical="top"
+                />
+              </View>
+
+              {/* Activities */}
+              {linkedActivities.length > 0 && (
+                <View style={styles.activitiesBlock}>
+                  <Text style={styles.sectionLabel}>Atividades relacionadas</Text>
+                  {linkedActivities.map(act => (
+                    <View key={act.id} style={styles.actRow}>
+                      <View style={{ flex: 1, gap: 1 }}>
+                        <Text style={styles.actName} numberOfLines={2}>
+                          {act.subject} — {act.description}
+                        </Text>
+                        {act.link ? (
+                          <Text style={styles.actLink} numberOfLines={1}>{act.link}</Text>
+                        ) : null}
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => handleUnlink(dateStr, act.id)}
+                        hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="close-circle-outline" size={18} color={Colors.textTertiary} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          );
+        })}
       </ScrollView>
+
+      {/* Link Existing Activity Modal */}
+      <Modal visible={linkModal} transparent animationType="slide">
+        <TouchableOpacity style={modal.overlay} activeOpacity={1} onPress={() => setLinkModal(false)}>
+          <View style={[modal.sheet, { paddingBottom: insets.bottom + 16 }]} onStartShouldSetResponder={() => true}>
+            <View style={modal.handle} />
+            <View style={modal.titleRow}>
+              <Text style={modal.title}>Adicionar atividade</Text>
+              <TouchableOpacity
+                onPress={() => { setLinkModal(false); setCreateModal(true); }}
+                activeOpacity={0.8}
+              >
+                <Text style={modal.createLink}>+ Criar nova</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 340 }} keyboardShouldPersistTaps="handled">
+              {availableToLink.length === 0 ? (
+                <Text style={modal.emptyText}>Nenhuma atividade disponível para associar.</Text>
+              ) : (
+                availableToLink.map(a => (
+                  <TouchableOpacity key={a.id} style={modal.actRow} onPress={() => handleLinkActivity(a.id)} activeOpacity={0.8}>
+                    <View style={[modal.pill, { backgroundColor: a.type === 'homework' ? Colors.homeworkLight : Colors.classworkLight }]}>
+                      <Text style={[modal.pillText, { color: a.type === 'homework' ? Colors.homework : Colors.classwork }]}>
+                        {a.type === 'homework' ? 'Casa' : 'Sala'}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={modal.actSubject}>{a.subject}</Text>
+                      <Text style={modal.actDesc} numberOfLines={1}>{a.description}</Text>
+                    </View>
+                    <Ionicons name="add-circle-outline" size={22} color={Colors.primary} />
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+            <TouchableOpacity style={modal.closeBtn} onPress={() => setLinkModal(false)} activeOpacity={0.8}>
+              <Text style={modal.closeBtnText}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Create New Activity Modal */}
+      <Modal visible={createModal} transparent animationType="slide">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <TouchableOpacity style={modal.overlay} activeOpacity={1} onPress={() => setCreateModal(false)}>
+            <View style={[modal.sheet, { paddingBottom: insets.bottom + 16 }]} onStartShouldSetResponder={() => true}>
+              <View style={modal.handle} />
+              <Text style={modal.title}>Nova atividade</Text>
+              {subjects.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {subjects.map(sub => (
+                      <TouchableOpacity
+                        key={sub}
+                        style={[modal.chip, newAct.subject === sub && modal.chipActive]}
+                        onPress={() => setNewAct(a => ({ ...a, subject: sub }))}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[modal.chipText, newAct.subject === sub && modal.chipActiveText]}>{sub}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              )}
+              <View style={modal.typeRow}>
+                <TouchableOpacity
+                  style={[modal.typeBtn, newAct.type === 'homework' && { borderColor: Colors.homework, backgroundColor: Colors.homeworkLight }]}
+                  onPress={() => setNewAct(a => ({ ...a, type: 'homework' }))}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[modal.typeBtnText, newAct.type === 'homework' && { color: Colors.homework }]}>Para casa</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[modal.typeBtn, newAct.type === 'classwork' && { borderColor: Colors.primary, backgroundColor: Colors.primaryLight }]}
+                  onPress={() => setNewAct(a => ({ ...a, type: 'classwork' }))}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[modal.typeBtnText, newAct.type === 'classwork' && { color: Colors.primary }]}>Em sala</Text>
+                </TouchableOpacity>
+              </View>
+              <TextInput
+                style={[modal.input, { minHeight: 90, textAlignVertical: 'top' }]}
+                placeholder="Descrição da atividade..."
+                placeholderTextColor={Colors.textTertiary}
+                value={newAct.description}
+                onChangeText={t => setNewAct(a => ({ ...a, description: t }))}
+                multiline
+                autoFocus
+              />
+              <View style={modal.btnRow}>
+                <TouchableOpacity style={modal.closeBtn} onPress={() => setCreateModal(false)} activeOpacity={0.8}>
+                  <Text style={modal.closeBtnText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[modal.confirmBtn, (!newAct.description.trim() || creatingAct) && { opacity: 0.5 }]}
+                  onPress={handleCreateAndLink}
+                  disabled={!newAct.description.trim() || creatingAct}
+                  activeOpacity={0.85}
+                >
+                  {creatingAct
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <Text style={modal.confirmText}>Criar e associar</Text>
+                  }
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: {
+
+  monthHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    backgroundColor: Colors.surface,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: Colors.surfaceSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  navBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: Colors.surfaceSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerMid: { flex: 1, marginHorizontal: 12 },
-  headerTitle: { fontFamily: 'Inter_700Bold', fontSize: 18, color: Colors.text },
-  headerSub: { fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.textSecondary, marginTop: 1 },
+  monthCenter: { flex: 1, alignItems: 'center' },
+  monthTitle: { fontFamily: 'Inter_700Bold', fontSize: 18, color: Colors.text },
+  monthSub: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
 
-  dayLabelRow: {
+  weekNav: {
     flexDirection: 'row',
-    marginTop: 16,
-    marginBottom: 4,
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
-  dayLabel: {
+  weekArrow: { padding: 6 },
+  weekLabel: {
     flex: 1,
     textAlign: 'center',
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 11,
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  dayCell: {
-    width: CELL_SIZE,
-    height: CELL_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-    padding: 2,
-  },
-  dayCellToday: {
-    backgroundColor: Colors.primary,
-  },
-  dayCellHasPlan: {
-    backgroundColor: Colors.primaryLight,
-  },
-  dayNum: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 14,
+    fontSize: 15,
     color: Colors.text,
   },
-  dayNumToday: {
-    color: '#fff',
-    fontFamily: 'Inter_700Bold',
+
+  scroll: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    gap: 12,
   },
-  dayNumHasPlan: {
-    color: Colors.primary,
-    fontFamily: 'Inter_600SemiBold',
-  },
-  planDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.primary,
-    marginTop: 2,
-  },
-  planDotToday: {
-    backgroundColor: '#fff',
-  },
-  legend: {
-    flexDirection: 'row',
-    gap: 16,
-    justifyContent: 'center',
-    marginTop: 24,
-    paddingBottom: 8,
-  },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textSecondary },
 
   card: {
     backgroundColor: Colors.surface,
-    borderRadius: 20,
-    padding: 16,
-    marginTop: 12,
-    borderWidth: 1,
+    borderRadius: 18,
+    borderWidth: 1.5,
     borderColor: Colors.border,
+    padding: 14,
+    gap: 10,
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  cardTitle: { fontFamily: 'Inter_700Bold', fontSize: 15, color: Colors.text, marginBottom: 10 },
-  descriptionInput: {
-    fontFamily: 'Inter_400Regular',
+  cardToday: {
+    borderColor: Colors.primary,
+  },
+
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dayLabelWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  todayDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: Colors.primary,
+  },
+  dayName: {
+    fontFamily: 'Inter_700Bold',
     fontSize: 15,
     color: Colors.text,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    borderRadius: 12,
-    padding: 12,
-    minHeight: 140,
-    backgroundColor: Colors.background,
-    lineHeight: 22,
   },
-  saveBtn: {
+
+  addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingVertical: 10,
-    marginTop: 10,
-  },
-  saveBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: '#fff' },
-  actBtnRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  actBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surfaceSecondary,
-  },
-  actBtnPrimary: {
-    borderColor: Colors.primary + '40',
+    gap: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
     backgroundColor: Colors.primaryLight,
   },
-  actBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 12, color: Colors.text },
-  emptyActivities: { alignItems: 'center', paddingVertical: 24, gap: 6 },
-  emptyActText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.textSecondary },
-  activityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
+  addBtnText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 11,
+    color: Colors.primary,
   },
-  typeDot: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, alignSelf: 'flex-start', marginTop: 2 },
-  typeDotText: { fontFamily: 'Inter_700Bold', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
-  activitySubject: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: Colors.text },
-  activityDesc: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
-  unlinkBtn: { padding: 4 },
+
+  divider: {
+    height: 1,
+    backgroundColor: Colors.borderLight,
+  },
+
+  descBlock: { gap: 4 },
+  sectionLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 10,
+    color: Colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  descInput: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    color: Colors.text,
+    lineHeight: 20,
+    minHeight: 52,
+    paddingTop: 2,
+  },
+
+  activitiesBlock: {
+    gap: 6,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+  },
+  actRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  actName: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    color: Colors.text,
+    lineHeight: 18,
+  },
+  actLink: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    color: Colors.primary,
+  },
 });
 
-const modalStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  card: {
+const modal = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.38)', justifyContent: 'flex-end' },
+  sheet: {
     backgroundColor: Colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -686,70 +627,55 @@ const modalStyles = StyleSheet.create({
     paddingTop: 12,
   },
   handle: {
-    width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border,
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: Colors.border,
     alignSelf: 'center', marginBottom: 16,
   },
-  title: { fontFamily: 'Inter_700Bold', fontSize: 18, color: Colors.text, marginBottom: 16 },
-  emptyText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.textSecondary, textAlign: 'center', paddingVertical: 16 },
-  actRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+  titleRow: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginBottom: 16,
   },
-  typePill: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  typePillText: { fontFamily: 'Inter_700Bold', fontSize: 10, textTransform: 'uppercase' },
+  title: { fontFamily: 'Inter_700Bold', fontSize: 18, color: Colors.text },
+  createLink: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: Colors.primary },
+  emptyText: {
+    fontFamily: 'Inter_400Regular', fontSize: 14,
+    color: Colors.textSecondary, textAlign: 'center', paddingVertical: 20,
+  },
+  actRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  pill: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+  pillText: { fontFamily: 'Inter_700Bold', fontSize: 10, textTransform: 'uppercase' },
   actSubject: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: Colors.text },
   actDesc: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textSecondary, marginTop: 1 },
-  input: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-    color: Colors.text,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    borderRadius: 12,
-    padding: 12,
-    backgroundColor: Colors.background,
-    marginBottom: 12,
+  closeBtn: {
+    flex: 1, paddingVertical: 12, borderRadius: 12,
+    backgroundColor: Colors.surfaceSecondary, alignItems: 'center', marginTop: 12,
   },
+  closeBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: Colors.text },
   typeRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   typeBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    alignItems: 'center',
+    flex: 1, paddingVertical: 8, borderRadius: 10,
+    borderWidth: 1.5, borderColor: Colors.border, alignItems: 'center',
   },
   typeBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: Colors.textSecondary },
-  subjectChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: Colors.surfaceSecondary,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
+  chip: {
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
+    backgroundColor: Colors.surfaceSecondary, borderWidth: 1.5, borderColor: Colors.border,
   },
-  subjectChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  subjectChipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.text },
-  subjectChipActiveText: { color: '#fff' },
-  buttons: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  cancelBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: Colors.surfaceSecondary,
-    alignItems: 'center',
+  chipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  chipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.text },
+  chipActiveText: { color: '#fff' },
+  input: {
+    fontFamily: 'Inter_400Regular', fontSize: 15, color: Colors.text,
+    borderWidth: 1.5, borderColor: Colors.border, borderRadius: 12,
+    padding: 12, backgroundColor: Colors.background, marginBottom: 12,
   },
-  cancelText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: Colors.text },
+  btnRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
   confirmBtn: {
-    flex: 2,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
+    flex: 2, paddingVertical: 12, borderRadius: 12,
+    backgroundColor: Colors.primary, alignItems: 'center',
   },
   confirmText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: '#fff' },
 });
