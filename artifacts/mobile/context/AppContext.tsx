@@ -52,7 +52,7 @@ interface AppContextValue {
   justifyAbsence: (studentId: string, date: string, justification: string) => Promise<void>;
   setAttendanceRecord: (studentId: string, date: string, present: boolean) => Promise<void>;
   getAttendanceForDate: (date: string) => AttendanceRecord[];
-  addActivity: (activity: Omit<Activity, 'id' | 'createdAt'>) => Promise<void>;
+  addActivity: (activity: Omit<Activity, 'id' | 'createdAt'>) => Promise<Activity | undefined>;
   updateActivity: (id: string, updates: Partial<Omit<Activity, 'id' | 'createdAt'>>) => Promise<void>;
   removeActivity: (id: string) => Promise<void>;
   toggleDelivery: (activityId: string, studentId: string) => Promise<void>;
@@ -261,18 +261,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return attendance.filter(a => a.date === date);
   }, [attendance]);
 
-  const addActivity = useCallback(async (activity: Omit<Activity, 'id' | 'createdAt'>) => {
-    if (!token) return;
+  const addActivity = useCallback(async (activity: Omit<Activity, 'id' | 'createdAt'>): Promise<Activity | undefined> => {
+    if (!token) return undefined;
+    let result: Activity | undefined;
     await withErrorHandling(async () => {
       const created = await apiFetch<ApiActivity>('/activities', {
         method: 'POST',
         body: JSON.stringify(activity),
         token,
       });
+      const mapped: Activity = { ...created, type: created.type as 'homework' | 'classwork' };
       setActivities(prev =>
-        [...prev, { ...created, type: created.type as 'homework' | 'classwork' }].sort((a, b) => b.date.localeCompare(a.date))
+        [...prev, mapped].sort((a, b) => b.date.localeCompare(a.date))
       );
+      result = mapped;
     });
+    return result;
   }, [token, withErrorHandling]);
 
   const updateActivity = useCallback(async (id: string, updates: Partial<Omit<Activity, 'id' | 'createdAt'>>) => {

@@ -11,17 +11,20 @@ import {
   Platform,
   KeyboardAvoidingView,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/colors';
 import { useAuth } from '@/context/AuthContext';
 import { useApp, Activity } from '@/context/AppContext';
-import { apiFetch, ApiError } from '@/utils/api';
+import { apiFetch } from '@/utils/api';
 import { toISO, getBrasiliaDate, formatBR } from '@/utils/date';
 
 const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const SCREEN_PADDING = 24;
+const CELL_SIZE = Math.floor((Dimensions.get('window').width - SCREEN_PADDING) / 7);
 const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
 type LessonPlan = {
@@ -54,7 +57,7 @@ function getTodayISO(): string {
 export default function PlanningScreen() {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
-  const { activities } = useApp();
+  const { activities, addActivity } = useApp();
   const topPadding = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPadding = Platform.OS === 'web' ? 34 : 0;
 
@@ -197,18 +200,15 @@ export default function PlanningScreen() {
     if (!selectedDate || !newAct.description.trim() || !token) return;
     setCreatingAct(true);
     try {
-      type ApiActivity = { id: string; subject: string; type: string; description: string; date: string; createdAt: string };
-      const createdActivity = await apiFetch<ApiActivity>('/activities', {
-        method: 'POST',
-        token,
-        body: JSON.stringify({
-          subject: newAct.subject || (activities[0]?.subject ?? 'Geral'),
-          type: newAct.type,
-          description: newAct.description,
-          date: selectedDate,
-        }),
+      const createdActivity = await addActivity({
+        subject: newAct.subject || (activities[0]?.subject ?? 'Geral'),
+        type: newAct.type,
+        description: newAct.description,
+        date: selectedDate,
       });
-      await handleLinkActivity(createdActivity.id);
+      if (createdActivity) {
+        await handleLinkActivity(createdActivity.id);
+      }
       setCreateModal(false);
       setNewAct({ description: '', type: 'homework', subject: '' });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -561,8 +561,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   dayCell: {
-    width: `${100 / 7}%` as any,
-    aspectRatio: 1,
+    width: CELL_SIZE,
+    height: CELL_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 10,
