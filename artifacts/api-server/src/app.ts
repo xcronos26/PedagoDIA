@@ -37,7 +37,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api", router);
 
 // Servir arquivos estáticos do web
-const webDistPath = path.join(__dirname, "../../web/dist");
+const webDistPath = path.join(__dirname, "../../web/dist/public");
 app.use(express.static(webDistPath));
 
 // SPA fallback - qualquer rota que não seja API ou arquivo estático retorna index.html
