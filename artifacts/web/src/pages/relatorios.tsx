@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useStudents } from "@/hooks/use-students";
@@ -7,10 +7,11 @@ import { useActivities } from "@/hooks/use-activities";
 import { useAllDeliveries } from "@/hooks/use-deliveries";
 import { useJustifyAbsence } from "@/hooks/use-attendance";
 import { useGenerateParentToken } from "@/hooks/use-parent-token";
-import { BarChart3, TrendingUp, CheckCircle2, XCircle, Search, User as UserIcon, BookOpen, Calendar, AlertCircle, Edit3, Eye, FileText, Link as LinkIcon, ExternalLink, Share2, Copy } from "lucide-react";
+import { BarChart3, TrendingUp, CheckCircle2, XCircle, Search, User as UserIcon, BookOpen, Calendar, AlertCircle, Edit3, Eye, FileText, Link as LinkIcon, ExternalLink, Share2, Copy, Printer } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import QRCode from "react-qr-code";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -33,6 +34,7 @@ export default function Relatorios() {
   const [justificationText, setJustificationText] = useState("");
   const [selectedActivity, setSelectedActivity] = useState<any>(null);
   const [shareLinkData, setShareLinkData] = useState<{ url: string; expiresAt: string } | null>(null);
+  const shareQrContainerRef = useRef<HTMLDivElement | null>(null);
   
   const generateParentToken = useGenerateParentToken();
 
@@ -78,19 +80,65 @@ export default function Relatorios() {
     });
   };
 
-  const copyToClipboard = () => {
+  const copyToClipboard = (e?: React.MouseEvent<HTMLButtonElement>) => {
     if (shareLinkData?.url) {
       navigator.clipboard.writeText(shareLinkData.url);
       // Feedback visual simples
-      const button = event?.target as HTMLButtonElement;
+      const button = e?.currentTarget;
       if (button) {
         const originalText = button.innerHTML;
-        button.innerHTML = '✓ Copiado!';
+        button.innerHTML = "✓ Copiado!";
         setTimeout(() => {
           button.innerHTML = originalText;
         }, 2000);
       }
     }
+  };
+
+  const printShareLink = () => {
+    if (!shareLinkData?.url) return;
+    const svg = shareQrContainerRef.current?.querySelector("svg")?.outerHTML;
+
+    const w = window.open("", "_blank", "noopener,noreferrer");
+    if (!w) return;
+
+    const expires = shareLinkData.expiresAt
+      ? format(new Date(shareLinkData.expiresAt), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
+      : "";
+
+    w.document.open();
+    w.document.write(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Link Compartilhado</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; padding: 32px; color: #111827; }
+      .wrap { max-width: 520px; margin: 0 auto; }
+      h1 { font-size: 20px; margin: 0 0 12px; }
+      .qr { width: 220px; height: 220px; display: flex; align-items: center; justify-content: center; border: 1px solid #E5E7EB; border-radius: 16px; padding: 16px; }
+      .row { margin-top: 16px; }
+      .label { font-size: 12px; color: #6B7280; margin-bottom: 6px; font-weight: 600; }
+      .value { font-size: 12px; word-break: break-all; padding: 12px 14px; border: 1px solid #E5E7EB; border-radius: 12px; }
+      .expires { font-size: 12px; color: #374151; }
+      @media print { body { padding: 0; } .wrap { max-width: none; margin: 0; } }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Link Compartilhado</h1>
+      <div class="qr">${svg ?? ""}</div>
+      <div class="row">
+        <div class="label">Link de acesso</div>
+        <div class="value">${shareLinkData.url}</div>
+      </div>
+      ${expires ? `<div class="row"><div class="label">Válido até</div><div class="expires">${expires}</div></div>` : ""}
+      <script>window.onload = () => window.print();</script>
+    </div>
+  </body>
+</html>`);
+    w.document.close();
   };
 
   const stats = useMemo(() => {
@@ -481,6 +529,12 @@ export default function Relatorios() {
             </div>
             
             <div className="p-6 space-y-4">
+              <div className="flex items-center justify-center">
+                <div ref={shareQrContainerRef} className="p-4 bg-white rounded-2xl border border-border shadow-sm">
+                  <QRCode value={shareLinkData.url} size={180} />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-bold text-foreground mb-2">Link de acesso</label>
                 <div className="flex items-center gap-2">
@@ -516,6 +570,14 @@ export default function Relatorios() {
             </div>
             
             <div className="p-6 border-t border-border/50 flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={printShareLink}
+                className="px-6 py-3 rounded-xl font-bold text-foreground bg-muted/40 hover:bg-muted/60 transition-colors flex items-center gap-2"
+              >
+                <Printer className="w-4 h-4" />
+                Imprimir
+              </button>
               <button
                 type="button"
                 onClick={() => setShareLinkData(null)}

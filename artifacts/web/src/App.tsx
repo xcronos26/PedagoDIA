@@ -53,14 +53,14 @@ function Router() {
       <Route path="/register"><AuthRoute component={Register} /></Route>
       
       {/* Protected routes with layout */}
-      <Route path="/:rest*">
+      <Route>
         <Layout>
           <Switch>
-            <Route path="/" component={Dashboard} />
-            <Route path="/chamada" component={Chamada} />
-            <Route path="/diario" component={Diario} />
-            <Route path="/atividades" component={Atividades} />
-            <Route path="/relatorios" component={Relatorios} />
+            <Route path="/"><ProtectedRoute component={Dashboard} /></Route>
+            <Route path="/chamada"><ProtectedRoute component={Chamada} /></Route>
+            <Route path="/diario"><ProtectedRoute component={Diario} /></Route>
+            <Route path="/atividades"><ProtectedRoute component={Atividades} /></Route>
+            <Route path="/relatorios"><ProtectedRoute component={Relatorios} /></Route>
             <Route component={NotFound} />
           </Switch>
         </Layout>
