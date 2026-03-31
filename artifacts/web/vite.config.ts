@@ -17,7 +17,7 @@ if (rawPort && (Number.isNaN(port) || port <= 0)) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-const basePath = process.env.BASE_PATH ?? "/web/";
+const basePath = process.env.BASE_PATH ?? (isProduction ? "/" : "/web/");
 
 export default defineConfig({
   base: basePath,
