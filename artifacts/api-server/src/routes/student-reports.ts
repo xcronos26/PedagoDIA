@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, studentReportsTable } from "@workspace/db";
+import { db, studentReportsTable, studentsTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
 
@@ -49,6 +49,13 @@ router.post("/student-reports", requireAuth, async (req, res) => {
     }
     if (!content || typeof content !== "string" || content.trim() === "") {
       res.status(400).json({ error: "content é obrigatório" });
+      return;
+    }
+    const [student] = await db.select({ id: studentsTable.id })
+      .from(studentsTable)
+      .where(and(eq(studentsTable.id, studentId), eq(studentsTable.teacherId, req.teacherId!)));
+    if (!student) {
+      res.status(403).json({ error: "Aluno não encontrado ou não pertence ao professor" });
       return;
     }
     const [report] = await db.insert(studentReportsTable).values({
