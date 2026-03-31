@@ -127,7 +127,7 @@ router.post("/students/:id/generate-parent-token", requireAuth, async (req, res)
     res.json({ 
       token: student.parentAccessToken,
       expiresAt: student.parentTokenExpires?.toISOString(),
-      url: `${req.protocol}://${req.get('host')}/relatorio/${student.parentAccessToken}`
+      url: `${req.protocol}://${req.get('host')}/web/relatorio/${student.parentAccessToken}`
     });
   } catch (err: any) {
     req.log.error({ err }, "Error generating parent token");

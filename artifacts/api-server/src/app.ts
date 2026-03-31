@@ -3,6 +3,12 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app: Express = express();
 
@@ -30,5 +36,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+const webDistPath = path.join(__dirname, "../../web/dist/public");
+if (fs.existsSync(webDistPath)) {
+  app.use("/web", express.static(webDistPath));
+
+  app.get("/web/(.*)", (req, res) => {
+    res.sendFile(path.join(webDistPath, "index.html"));
+  });
+}
 
 export default app;
