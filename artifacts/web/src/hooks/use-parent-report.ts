@@ -43,8 +43,7 @@ export function useParentReport(token: string) {
   return useQuery<ParentReportData>({
     queryKey: ['parent-report', token],
     queryFn: async () => {
-      // Usar fetch direto para endpoint público (sem autenticação)
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://responsive-website-builder--kukasnunes.replit.app/api';
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
       const response = await fetch(`${baseUrl}/relatorio/${token}`);
       
       if (!response.ok) {
