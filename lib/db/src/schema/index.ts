@@ -4,3 +4,4 @@ export * from "./students";
 export * from "./attendance";
 export * from "./activities";
 export * from "./deliveries";
+export * from "./student-reports";

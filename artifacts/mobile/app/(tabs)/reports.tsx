@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -149,11 +149,59 @@ export default function ReportsScreen() {
   const { students, activities, attendance, getDeliveriesForStudent, justifyAbsence, isLoaded, loadError, loadData } = useApp();
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState<'activities' | 'attendance'>('activities');
+  const [activeTab, setActiveTab] = useState<'activities' | 'reports' | 'attendance'>('activities');
   const [justModal, setJustModal] = useState<JustificationModal>(null);
   const [editJustText, setEditJustText] = useState('');
   const [activityModal, setActivityModal] = useState<{ activity: Activity; delivered: boolean; seen: boolean } | null>(null);
   const [sharingLink, setSharingLink] = useState(false);
+
+  type StudentReport = { id: string; studentId: string; date: string; content: string; createdAt: string };
+  const [privateReports, setPrivateReports] = useState<StudentReport[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [newReportModal, setNewReportModal] = useState(false);
+  const [newReportDate, setNewReportDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [newReportContent, setNewReportContent] = useState('');
+  const [savingReport, setSavingReport] = useState(false);
+
+  const fetchPrivateReports = useCallback(async () => {
+    if (!selectedStudent || !token) return;
+    setReportsLoading(true);
+    try {
+      const data = await apiFetch<StudentReport[]>(`/student-reports?studentId=${selectedStudent.id}`, { token });
+      setPrivateReports(data);
+    } catch (err: any) {
+      Alert.alert('Erro', 'Não foi possível carregar os relatórios.');
+    } finally {
+      setReportsLoading(false);
+    }
+  }, [selectedStudent, token]);
+
+  useEffect(() => {
+    if (activeTab === 'reports' && selectedStudent) {
+      fetchPrivateReports();
+    }
+  }, [activeTab, selectedStudent, fetchPrivateReports]);
+
+  const handleSaveReport = async () => {
+    if (!selectedStudent || !token || !newReportContent.trim() || !newReportDate) return;
+    setSavingReport(true);
+    try {
+      await apiFetch('/student-reports', {
+        method: 'POST',
+        token,
+        body: JSON.stringify({ studentId: selectedStudent.id, date: newReportDate, content: newReportContent.trim() }),
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setNewReportModal(false);
+      setNewReportContent('');
+      setNewReportDate(new Date().toISOString().split('T')[0]);
+      await fetchPrivateReports();
+    } catch (err: any) {
+      Alert.alert('Erro', 'Não foi possível salvar o relatório.');
+    } finally {
+      setSavingReport(false);
+    }
+  };
 
   const handleShareParentReport = async () => {
     if (!selectedStudent || !token) return;
@@ -225,7 +273,7 @@ export default function ReportsScreen() {
     return (
       <View style={[styles.container, { paddingTop: topPadding }]}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => { setSelectedStudent(null); setActiveTab('activities'); setExpandedSubjects(new Set()); }} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => { setSelectedStudent(null); setActiveTab('activities'); setExpandedSubjects(new Set()); setPrivateReports([]); }} activeOpacity={0.8}>
             <Ionicons name="arrow-back" size={24} color={Colors.text} />
           </TouchableOpacity>
           <View style={styles.headerMid}>
@@ -256,6 +304,14 @@ export default function ReportsScreen() {
             <Text style={[styles.tabText, activeTab === 'activities' && styles.tabTextActive]}>Atividades</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            style={[styles.tab, activeTab === 'reports' && styles.tabActive]}
+            onPress={() => setActiveTab('reports')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="document-text-outline" size={16} color={activeTab === 'reports' ? Colors.primary : Colors.textSecondary} />
+            <Text style={[styles.tabText, activeTab === 'reports' && styles.tabTextActive]}>Relatórios</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.tab, activeTab === 'attendance' && styles.tabActive]}
             onPress={() => setActiveTab('attendance')}
             activeOpacity={0.8}
@@ -265,7 +321,46 @@ export default function ReportsScreen() {
           </TouchableOpacity>
         </View>
 
-        {activeTab === 'activities' ? (
+        {activeTab === 'reports' ? (
+          <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPadding + 100, gap: 10 }} showsVerticalScrollIndicator={false}>
+            <TouchableOpacity
+              style={styles.addReportBtn}
+              onPress={() => {
+                setNewReportDate(new Date().toISOString().split('T')[0]);
+                setNewReportContent('');
+                setNewReportModal(true);
+              }}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="add-circle-outline" size={20} color={Colors.primary} />
+              <Text style={styles.addReportBtnText}>Adicionar relatório</Text>
+            </TouchableOpacity>
+            {reportsLoading ? (
+              <ActivityIndicator color={Colors.primary} style={{ marginTop: 40 }} />
+            ) : privateReports.length === 0 ? (
+              <View style={[styles.emptyState, { marginTop: 40 }]}>
+                <View style={styles.emptyIcon}>
+                  <Ionicons name="document-text-outline" size={48} color={Colors.textTertiary} />
+                </View>
+                <Text style={styles.emptyTitle}>Nenhum relatório</Text>
+                <Text style={styles.emptySubtitle}>Toque em "Adicionar relatório" para registrar o primeiro</Text>
+              </View>
+            ) : (
+              privateReports.map(report => {
+                const [y, m, d] = report.date.split('-');
+                return (
+                  <View key={report.id} style={styles.reportCard}>
+                    <View style={styles.reportDateBadge}>
+                      <Ionicons name="calendar-outline" size={14} color={Colors.primary} />
+                      <Text style={styles.reportDateText}>{d}/{m}/{y}</Text>
+                    </View>
+                    <Text style={styles.reportContent}>{report.content}</Text>
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
+        ) : activeTab === 'activities' ? (
           <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPadding + 100, gap: 10 }} showsVerticalScrollIndicator={false}>
             {/* Summary */}
             <View style={styles.summaryCard}>
@@ -382,6 +477,58 @@ export default function ReportsScreen() {
             )}
           </ScrollView>
         )}
+
+      {/* New Report Creation Modal */}
+      <Modal visible={newReportModal} transparent animationType="slide">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <TouchableOpacity style={modalStyles.overlay} activeOpacity={1} onPress={() => setNewReportModal(false)}>
+            <View style={[modalStyles.card, { paddingBottom: insets.bottom + 16 }]} onStartShouldSetResponder={() => true}>
+              <View style={modalStyles.handle} />
+              <Text style={modalStyles.title}>Novo Relatório</Text>
+              <Text style={[modalStyles.subtitle, { marginBottom: 4 }]}>Visível apenas para o professor</Text>
+              <View style={styles.reportDateRow}>
+                <Ionicons name="calendar-outline" size={16} color={Colors.textSecondary} />
+                <TextInput
+                  style={styles.reportDateInput}
+                  value={newReportDate}
+                  onChangeText={setNewReportDate}
+                  placeholder="AAAA-MM-DD"
+                  placeholderTextColor={Colors.textTertiary}
+                  keyboardType="numeric"
+                  maxLength={10}
+                />
+              </View>
+              <TextInput
+                style={[modalStyles.input, { minHeight: 120 }]}
+                placeholder="Escreva o relatório do aluno para esta data..."
+                placeholderTextColor={Colors.textTertiary}
+                value={newReportContent}
+                onChangeText={setNewReportContent}
+                multiline
+                autoFocus
+                textAlignVertical="top"
+              />
+              <View style={modalStyles.buttons}>
+                <TouchableOpacity style={modalStyles.cancelBtn} onPress={() => setNewReportModal(false)} activeOpacity={0.8}>
+                  <Text style={modalStyles.cancelBtnText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[modalStyles.confirmBtn, (!newReportContent.trim() || savingReport) && modalStyles.btnDisabled]}
+                  onPress={handleSaveReport}
+                  activeOpacity={0.85}
+                  disabled={!newReportContent.trim() || savingReport}
+                >
+                  {savingReport ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={modalStyles.confirmBtnText}>Salvar</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Activity Detail Modal */}
       {activityModal && (
@@ -709,6 +856,31 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 20, fontFamily: 'Inter_600SemiBold', color: Colors.text, textAlign: 'center' },
   emptySubtitle: { fontSize: 15, fontFamily: 'Inter_400Regular', color: Colors.textSecondary, textAlign: 'center' },
+  addReportBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: Colors.primaryLight, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 20,
+    borderWidth: 1.5, borderColor: Colors.primary + '40',
+  },
+  addReportBtnText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: Colors.primary },
+  reportCard: {
+    backgroundColor: Colors.surface, borderRadius: 16, padding: 16,
+    borderWidth: 1, borderColor: Colors.border, gap: 10,
+  },
+  reportDateBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.primaryLight, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
+  },
+  reportDateText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: Colors.primary },
+  reportContent: { fontSize: 15, fontFamily: 'Inter_400Regular', color: Colors.text, lineHeight: 22 },
+  reportDateRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.surfaceSecondary, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
+    borderWidth: 1.5, borderColor: Colors.border,
+  },
+  reportDateInput: {
+    flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular', color: Colors.text,
+  },
 });
 
 const modalStyles = StyleSheet.create({

@@ -7,6 +7,7 @@ import { useActivities } from "@/hooks/use-activities";
 import { useAllDeliveries } from "@/hooks/use-deliveries";
 import { useJustifyAbsence } from "@/hooks/use-attendance";
 import { useGenerateParentToken } from "@/hooks/use-parent-token";
+import { useStudentReports, useCreateStudentReport } from "@/hooks/use-student-reports";
 import { BarChart3, TrendingUp, CheckCircle2, XCircle, Search, User as UserIcon, BookOpen, Calendar, AlertCircle, Edit3, Eye, FileText, Link as LinkIcon, ExternalLink, Share2, Copy, Printer } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { clsx, type ClassValue } from "clsx";
@@ -35,8 +36,13 @@ export default function Relatorios() {
   const [selectedActivity, setSelectedActivity] = useState<any>(null);
   const [shareLinkData, setShareLinkData] = useState<{ url: string; expiresAt: string } | null>(null);
   const shareQrContainerRef = useRef<HTMLDivElement | null>(null);
+  const [reportModal, setReportModal] = useState(false);
+  const [reportDate, setReportDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [reportContent, setReportContent] = useState('');
   
   const generateParentToken = useGenerateParentToken();
+  const { data: studentReports } = useStudentReports(selectedStudentId || null);
+  const createStudentReport = useCreateStudentReport();
 
   const filteredStudents = useMemo(() => {
     if (!students) return [];
@@ -452,6 +458,41 @@ export default function Relatorios() {
               )}
             </div>
 
+            {/* Private Teacher Reports */}
+            <div className="bg-card rounded-3xl p-6 shadow-sm border border-border/50">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-display font-bold text-foreground flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-primary" /> Relatórios do Professor
+                </h3>
+                <button
+                  onClick={() => { setReportDate(new Date().toISOString().split('T')[0]); setReportContent(''); setReportModal(true); }}
+                  className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors flex items-center gap-2 font-medium text-sm"
+                >
+                  + Adicionar relatório
+                </button>
+              </div>
+              {!studentReports?.length ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 rounded-full bg-muted/40 flex items-center justify-center mx-auto mb-4">
+                    <FileText className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <p className="text-muted-foreground font-medium">Nenhum relatório registrado</p>
+                  <p className="text-muted-foreground text-sm mt-1">Clique em "Adicionar relatório" para criar o primeiro</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {studentReports.map(report => (
+                    <div key={report.id} className="p-4 rounded-xl border border-border/50 bg-muted/10">
+                      <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2">
+                        {format(parseISO(report.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                      </p>
+                      <p className="text-foreground leading-relaxed whitespace-pre-wrap">{report.content}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Activities Detailed List */}
             <div className="bg-card rounded-3xl p-6 shadow-sm border border-border/50">
               <h3 className="text-xl font-display font-bold text-foreground mb-6">Histórico de Atividades</h3>
@@ -513,6 +554,69 @@ export default function Relatorios() {
           </div>
         )}
       </div>
+
+      {/* Report Creation Modal */}
+      {reportModal && selectedStudentId && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-card rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-border/50">
+              <h2 className="text-2xl font-display font-bold text-foreground flex items-center gap-2">
+                <FileText className="w-6 h-6 text-primary" />
+                Novo Relatório
+              </h2>
+              <p className="text-muted-foreground mt-1">Relatório privado — visível apenas para o professor</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-foreground mb-2">Data</label>
+                <input
+                  type="date"
+                  value={reportDate}
+                  onChange={e => setReportDate(e.target.value)}
+                  className="w-full px-4 py-3 bg-background border-2 border-border/60 rounded-xl focus:border-primary outline-none transition-all text-sm font-medium"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-foreground mb-2">Descrição</label>
+                <textarea
+                  value={reportContent}
+                  onChange={e => setReportContent(e.target.value)}
+                  placeholder="Escreva o relatório do aluno para esta data..."
+                  rows={6}
+                  className="w-full px-4 py-3 bg-background border-2 border-border/60 rounded-xl focus:border-primary outline-none transition-all text-sm resize-none"
+                />
+              </div>
+            </div>
+            <div className="p-6 border-t border-border/50 flex gap-3 justify-end">
+              <button
+                onClick={() => setReportModal(false)}
+                className="px-6 py-3 rounded-xl font-bold text-foreground bg-muted/40 hover:bg-muted/60 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (!reportContent.trim() || !reportDate) return;
+                  createStudentReport.mutate({
+                    studentId: selectedStudentId,
+                    date: reportDate,
+                    content: reportContent.trim(),
+                  }, {
+                    onSuccess: () => {
+                      setReportModal(false);
+                      setReportContent('');
+                    }
+                  });
+                }}
+                disabled={!reportContent.trim() || !reportDate || createStudentReport.isPending}
+                className="px-6 py-3 rounded-xl font-bold text-white bg-primary hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {createStudentReport.isPending ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Share Link Modal */}
       {shareLinkData && (
