@@ -23,7 +23,7 @@ publicDir = "artifacts/web/dist/public"
 serve = "static"
 
 [[services.production.rewrites]]
-from = "/{*path}"
+from = "/*"
 to = "/index.html"
 
 [services.env]
