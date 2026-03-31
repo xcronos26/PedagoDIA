@@ -68,33 +68,25 @@ router.post("/lesson-plans", requireAuth, async (req, res) => {
       return;
     }
 
-    const [existing] = await db.select()
-      .from(lessonPlansTable)
-      .where(and(eq(lessonPlansTable.teacherId, req.teacherId!), eq(lessonPlansTable.date, date)));
-
-    let plan: typeof lessonPlansTable.$inferSelect;
-
-    if (existing) {
-      [plan] = await db.update(lessonPlansTable)
-        .set({ description: description ?? "" })
-        .where(eq(lessonPlansTable.id, existing.id))
-        .returning();
-    } else {
-      [plan] = await db.insert(lessonPlansTable)
-        .values({
-          id: generateId(),
-          teacherId: req.teacherId!,
-          date,
-          description: description ?? "",
-        })
-        .returning();
-    }
+    const desc = description ?? "";
+    const [plan] = await db.insert(lessonPlansTable)
+      .values({
+        id: generateId(),
+        teacherId: req.teacherId!,
+        date,
+        description: desc,
+      })
+      .onConflictDoUpdate({
+        target: [lessonPlansTable.teacherId, lessonPlansTable.date],
+        set: { description: desc },
+      })
+      .returning();
 
     const activityLinks = await db.select({ activityId: lessonPlanActivitiesTable.activityId })
       .from(lessonPlanActivitiesTable)
       .where(eq(lessonPlanActivitiesTable.lessonPlanId, plan.id));
 
-    res.status(existing ? 200 : 201).json(mapPlan(plan, activityLinks.map(a => a.activityId)));
+    res.status(200).json(mapPlan(plan, activityLinks.map(a => a.activityId)));
   } catch (err) {
     req.log.error({ err }, "Error upserting lesson plan");
     res.status(500).json({ error: "Erro interno do servidor" });
@@ -127,20 +119,9 @@ router.post("/lesson-plans/:id/activities", requireAuth, async (req, res) => {
       return;
     }
 
-    const [existing] = await db.select()
-      .from(lessonPlanActivitiesTable)
-      .where(and(
-        eq(lessonPlanActivitiesTable.lessonPlanId, id),
-        eq(lessonPlanActivitiesTable.activityId, activityId)
-      ));
-
-    if (!existing) {
-      await db.insert(lessonPlanActivitiesTable).values({
-        id: generateId(),
-        lessonPlanId: id,
-        activityId,
-      });
-    }
+    await db.insert(lessonPlanActivitiesTable)
+      .values({ id: generateId(), lessonPlanId: id, activityId })
+      .onConflictDoNothing();
 
     res.status(201).json({ lessonPlanId: id, activityId });
   } catch (err) {
