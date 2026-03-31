@@ -8,6 +8,7 @@ import activitiesRouter from "./activities";
 import deliveriesRouter from "./deliveries";
 import parentReportsRouter from "./parent-reports";
 import studentReportsRouter from "./student-reports";
+import lessonPlansRouter from "./lesson-plans";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(activitiesRouter);
 router.use(deliveriesRouter);
 router.use(parentReportsRouter);
 router.use(studentReportsRouter);
+router.use(lessonPlansRouter);
 
 export default router;

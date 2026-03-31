@@ -55,7 +55,7 @@ React + Vite web app (PedagoDIA Web) at `/web/` path. Full-featured classroom ma
 
 - **Auth**: JWT-based login/register; token stored in `localStorage` as `pedagogia_token` / `pedagogia_teacher`
 - **Pages**: Login (`/web/login`), Register (`/web/register`), main layout with 4 tabs
-- **Tabs**: Chamada (daily attendance), Diário (diary/notes), Atividades (activities + delivery tracking), Relatórios (per-student reports with charts)
+- **Tabs**: Chamada (daily attendance), Diário (diary/notes), Atividades (activities + delivery tracking), Planejamento (daily lesson planning), Relatórios (per-student reports with charts)
 - **Theme**: Warm coral/orange primary (`hsl(15 85% 60%)`), Nunito (body) + Outfit (display fonts)
 - **Routing**: Wouter with base `/web`, auto-redirect to login on 401
 - **API client**: `src/lib/api.ts` — calls `/api` (absolute path, shared Replit proxy domain)
@@ -68,7 +68,7 @@ React + Vite web app (PedagoDIA Web) at `/web/` path. Full-featured classroom ma
 Expo React Native app (PedagoDIA) for classroom management. Features multi-teacher authentication with isolated data per teacher.
 
 - **Auth**: JWT-based login/register via API; token stored in AsyncStorage
-- **Screens**: Login (`(auth)/login`), Register (`(auth)/register`), Chamada (index), Diário, Atividades, Relatórios
+- **Screens**: Login (`(auth)/login`), Register (`(auth)/register`), Chamada (index), Diário, Atividades, Planejamento (daily lesson planning), Relatórios
 - **Context**: `AuthContext` (auth state + token), `AppContext` (data fetching via API)
 - **API client**: `utils/api.ts` — uses `EXPO_PUBLIC_DOMAIN` env var for base URL
 - **Routing**: Unauthenticated → `/(auth)/login`, Authenticated → `/(tabs)`

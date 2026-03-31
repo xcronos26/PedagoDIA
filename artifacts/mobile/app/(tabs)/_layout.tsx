@@ -23,6 +23,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "book", selected: "book.fill" }} />
         <Label>Atividades</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="planning">
+        <Icon sf={{ default: "calendar.badge.plus", selected: "calendar.badge.plus" }} />
+        <Label>Planejamento</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="reports">
         <Icon sf={{ default: "chart.bar", selected: "chart.bar.fill" }} />
         <Label>Relatórios</Label>
@@ -94,6 +98,18 @@ function ClassicTabLayout() {
               <SymbolView name="book.fill" tintColor={color} size={24} />
             ) : (
               <Feather name="book-open" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="planning"
+        options={{
+          title: "Planejamento",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="calendar.badge.plus" tintColor={color} size={24} />
+            ) : (
+              <Ionicons name="calendar-outline" size={22} color={color} />
             ),
         }}
       />

@@ -15,6 +15,7 @@ import Chamada from "@/pages/chamada";
 import Diario from "@/pages/diario";
 import Atividades from "@/pages/atividades";
 import Relatorios from "@/pages/relatorios";
+import Planejamento from "@/pages/planejamento";
 import RelatorioCompartilhado from "@/pages/relatorio-compartilhado";
 import NotFound from "@/pages/not-found";
 
@@ -61,6 +62,7 @@ function Router() {
             <Route path="/diario"><ProtectedRoute component={Diario} /></Route>
             <Route path="/atividades"><ProtectedRoute component={Atividades} /></Route>
             <Route path="/relatorios"><ProtectedRoute component={Relatorios} /></Route>
+            <Route path="/planejamento"><ProtectedRoute component={Planejamento} /></Route>
             <Route component={NotFound} />
           </Switch>
         </Layout>
