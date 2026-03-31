@@ -31,12 +31,19 @@ router.get("/relatorio/:token", async (req, res) => {
       return;
     }
 
+    // Data de hoje no formato YYYY-MM-DD (comparação lexicográfica funciona para ISO dates)
+    const today = new Date();
+    const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
     // Buscar dados do aluno
-    const [attendance, activities, deliveries] = await Promise.all([
+    const [attendance, allActivities, deliveries] = await Promise.all([
       db.select().from(attendanceTable).where(eq(attendanceTable.studentId, student.id)),
       db.select().from(activitiesTable).where(eq(activitiesTable.teacherId, student.teacherId)),
       db.select().from(deliveriesTable).where(eq(deliveriesTable.studentId, student.id))
     ]);
+
+    // Filtrar actividades: apenas as com data <= hoje (pais não vêem actividades futuras)
+    const activities = allActivities.filter(a => a.date <= todayISO);
 
     // Calcular estatísticas
     const totalDays = attendance.length;
@@ -45,8 +52,8 @@ router.get("/relatorio/:token", async (req, res) => {
     const attendancePercentage = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
 
     const totalActivities = activities.length;
-    const deliveredCount = deliveries.filter(d => d.delivered).length;
-    const seenCount = deliveries.filter(d => d.seen).length;
+    const deliveredCount = deliveries.filter(d => d.delivered && activities.some(a => a.id === d.activityId)).length;
+    const seenCount = deliveries.filter(d => d.seen && activities.some(a => a.id === d.activityId)).length;
     const activityPercentage = totalActivities > 0 ? Math.round((deliveredCount / totalActivities) * 100) : 0;
 
     // Retornar dados formatados
