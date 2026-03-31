@@ -374,6 +374,99 @@ export default function Relatorios() {
 
             </div>
 
+            {/* Activities Detailed List */}
+            <div className="bg-card rounded-3xl p-6 shadow-sm border border-border/50">
+              <h3 className="text-xl font-display font-bold text-foreground mb-6">Histórico de Atividades</h3>
+              
+              {!activities?.length ? (
+                <p className="text-muted-foreground p-4 text-center bg-muted/20 rounded-xl">Nenhuma atividade registrada.</p>
+              ) : (
+                <div className="space-y-3">
+                  {activities.map(activity => {
+                    const delivery = deliveries?.find(d => d.activityId === activity.id && d.studentId === selectedStudentId);
+                    const isDelivered = delivery?.delivered;
+
+                    return (
+                      <div key={activity.id} className="flex items-center justify-between p-4 rounded-xl border border-border/50 hover:bg-muted/10 transition-colors cursor-pointer group"
+                           onClick={() => setSelectedActivity(activity)}>
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={cn(
+                              "px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider",
+                              activity.type === 'homework' ? "bg-accent/30 text-accent-foreground" : "bg-primary/30 text-primary"
+                            )}>
+                              {activity.type === 'homework' ? 'Casa' : 'Sala'}
+                            </span>
+                            <span className="text-xs font-bold text-muted-foreground">
+                              {format(new Date(activity.date), "dd/MM/yyyy")}
+                            </span>
+                            {delivery?.seen && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-accent/30 text-accent-foreground flex items-center gap-1">
+                                <Eye className="w-3 h-3" />
+                                Visto
+                              </span>
+                            )}
+                          </div>
+                          <p className="font-bold text-foreground group-hover:text-primary transition-colors">{activity.subject}</p>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <div className={cn(
+                            "flex items-center gap-2 px-3 py-1.5 rounded-lg font-bold text-sm",
+                            isDelivered ? "text-success bg-success/10" : "text-destructive bg-destructive/10"
+                          )}>
+                            {isDelivered ? (
+                              <><CheckCircle2 className="w-5 h-5" /> Entregue</>
+                            ) : (
+                              <><XCircle className="w-5 h-5" /> Pendente</>
+                            )}
+                          </div>
+                          <div className="p-2 text-muted-foreground group-hover:text-primary transition-colors">
+                            <ExternalLink className="w-4 h-4" />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Private Teacher Reports */}
+            <div className="bg-card rounded-3xl p-6 shadow-sm border border-border/50">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-display font-bold text-foreground flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-primary" /> Relatórios do Professor
+                </h3>
+                <button
+                  onClick={() => { setReportDate(new Date().toISOString().split('T')[0]); setReportContent(''); setReportModal(true); }}
+                  className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors flex items-center gap-2 font-medium text-sm"
+                >
+                  + Adicionar relatório
+                </button>
+              </div>
+              {!studentReports?.length ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 rounded-full bg-muted/40 flex items-center justify-center mx-auto mb-4">
+                    <FileText className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <p className="text-muted-foreground font-medium">Nenhum relatório registrado</p>
+                  <p className="text-muted-foreground text-sm mt-1">Clique em "Adicionar relatório" para criar o primeiro</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {studentReports.map(report => (
+                    <div key={report.id} className="p-4 rounded-xl border border-border/50 bg-muted/10">
+                      <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2">
+                        {format(parseISO(report.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                      </p>
+                      <p className="text-foreground leading-relaxed whitespace-pre-wrap">{report.content}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Attendance Detailed History - Only Absences */}
             <div className="bg-card rounded-3xl p-6 shadow-sm border border-border/50">
               <h3 className="text-xl font-display font-bold text-foreground mb-6 flex items-center gap-2">
@@ -454,99 +547,6 @@ export default function Relatorios() {
                       </div>
                     </div>
                   ))}
-                </div>
-              )}
-            </div>
-
-            {/* Private Teacher Reports */}
-            <div className="bg-card rounded-3xl p-6 shadow-sm border border-border/50">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-display font-bold text-foreground flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-primary" /> Relatórios do Professor
-                </h3>
-                <button
-                  onClick={() => { setReportDate(new Date().toISOString().split('T')[0]); setReportContent(''); setReportModal(true); }}
-                  className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors flex items-center gap-2 font-medium text-sm"
-                >
-                  + Adicionar relatório
-                </button>
-              </div>
-              {!studentReports?.length ? (
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 rounded-full bg-muted/40 flex items-center justify-center mx-auto mb-4">
-                    <FileText className="w-8 h-8 text-muted-foreground" />
-                  </div>
-                  <p className="text-muted-foreground font-medium">Nenhum relatório registrado</p>
-                  <p className="text-muted-foreground text-sm mt-1">Clique em "Adicionar relatório" para criar o primeiro</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {studentReports.map(report => (
-                    <div key={report.id} className="p-4 rounded-xl border border-border/50 bg-muted/10">
-                      <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2">
-                        {format(parseISO(report.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                      </p>
-                      <p className="text-foreground leading-relaxed whitespace-pre-wrap">{report.content}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Activities Detailed List */}
-            <div className="bg-card rounded-3xl p-6 shadow-sm border border-border/50">
-              <h3 className="text-xl font-display font-bold text-foreground mb-6">Histórico de Atividades</h3>
-              
-              {!activities?.length ? (
-                <p className="text-muted-foreground p-4 text-center bg-muted/20 rounded-xl">Nenhuma atividade registrada.</p>
-              ) : (
-                <div className="space-y-3">
-                  {activities.map(activity => {
-                    const delivery = deliveries?.find(d => d.activityId === activity.id && d.studentId === selectedStudentId);
-                    const isDelivered = delivery?.delivered;
-
-                    return (
-                      <div key={activity.id} className="flex items-center justify-between p-4 rounded-xl border border-border/50 hover:bg-muted/10 transition-colors cursor-pointer group"
-                           onClick={() => setSelectedActivity(activity)}>
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className={cn(
-                              "px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider",
-                              activity.type === 'homework' ? "bg-accent/30 text-accent-foreground" : "bg-primary/30 text-primary"
-                            )}>
-                              {activity.type === 'homework' ? 'Casa' : 'Sala'}
-                            </span>
-                            <span className="text-xs font-bold text-muted-foreground">
-                              {format(new Date(activity.date), "dd/MM/yyyy")}
-                            </span>
-                            {delivery?.seen && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-accent/30 text-accent-foreground flex items-center gap-1">
-                                <Eye className="w-3 h-3" />
-                                Visto
-                              </span>
-                            )}
-                          </div>
-                          <p className="font-bold text-foreground group-hover:text-primary transition-colors">{activity.subject}</p>
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <div className={cn(
-                            "flex items-center gap-2 px-3 py-1.5 rounded-lg font-bold text-sm",
-                            isDelivered ? "text-success bg-success/10" : "text-destructive bg-destructive/10"
-                          )}>
-                            {isDelivered ? (
-                              <><CheckCircle2 className="w-5 h-5" /> Entregue</>
-                            ) : (
-                              <><XCircle className="w-5 h-5" /> Pendente</>
-                            )}
-                          </div>
-                          <div className="p-2 text-muted-foreground group-hover:text-primary transition-colors">
-                            <ExternalLink className="w-4 h-4" />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
                 </div>
               )}
             </div>

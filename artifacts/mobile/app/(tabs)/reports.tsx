@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   View,
   Text,
@@ -159,7 +160,8 @@ export default function ReportsScreen() {
   const [privateReports, setPrivateReports] = useState<StudentReport[]>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
   const [newReportModal, setNewReportModal] = useState(false);
-  const [newReportDate, setNewReportDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [newReportDateObj, setNewReportDateObj] = useState<Date>(() => new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [newReportContent, setNewReportContent] = useState('');
   const [savingReport, setSavingReport] = useState(false);
 
@@ -183,18 +185,20 @@ export default function ReportsScreen() {
   }, [activeTab, selectedStudent, fetchPrivateReports]);
 
   const handleSaveReport = async () => {
-    if (!selectedStudent || !token || !newReportContent.trim() || !newReportDate) return;
+    if (!selectedStudent || !token || !newReportContent.trim()) return;
+    const reportDate = newReportDateObj.toISOString().split('T')[0];
     setSavingReport(true);
     try {
       await apiFetch('/student-reports', {
         method: 'POST',
         token,
-        body: JSON.stringify({ studentId: selectedStudent.id, date: newReportDate, content: newReportContent.trim() }),
+        body: JSON.stringify({ studentId: selectedStudent.id, date: reportDate, content: newReportContent.trim() }),
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setNewReportModal(false);
       setNewReportContent('');
-      setNewReportDate(new Date().toISOString().split('T')[0]);
+      setNewReportDateObj(new Date());
+      setShowDatePicker(false);
       await fetchPrivateReports();
     } catch (err: any) {
       Alert.alert('Erro', 'Não foi possível salvar o relatório.');
@@ -326,7 +330,8 @@ export default function ReportsScreen() {
             <TouchableOpacity
               style={styles.addReportBtn}
               onPress={() => {
-                setNewReportDate(new Date().toISOString().split('T')[0]);
+                setNewReportDateObj(new Date());
+                setShowDatePicker(false);
                 setNewReportContent('');
                 setNewReportModal(true);
               }}
@@ -486,18 +491,29 @@ export default function ReportsScreen() {
               <View style={modalStyles.handle} />
               <Text style={modalStyles.title}>Novo Relatório</Text>
               <Text style={[modalStyles.subtitle, { marginBottom: 4 }]}>Visível apenas para o professor</Text>
-              <View style={styles.reportDateRow}>
+              <TouchableOpacity
+                style={styles.reportDateRow}
+                onPress={() => setShowDatePicker(true)}
+                activeOpacity={0.8}
+              >
                 <Ionicons name="calendar-outline" size={16} color={Colors.textSecondary} />
-                <TextInput
-                  style={styles.reportDateInput}
-                  value={newReportDate}
-                  onChangeText={setNewReportDate}
-                  placeholder="AAAA-MM-DD"
-                  placeholderTextColor={Colors.textTertiary}
-                  keyboardType="numeric"
-                  maxLength={10}
+                <Text style={styles.reportDateInput}>
+                  {newReportDateObj.toLocaleDateString('pt-BR')}
+                </Text>
+                <Ionicons name="chevron-down" size={14} color={Colors.textTertiary} style={{ marginLeft: 'auto' }} />
+              </TouchableOpacity>
+              {showDatePicker && Platform.OS !== 'web' && (
+                <DateTimePicker
+                  value={newReportDateObj}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  maximumDate={new Date()}
+                  onChange={(event, date) => {
+                    if (Platform.OS === 'android') setShowDatePicker(false);
+                    if (date) setNewReportDateObj(date);
+                  }}
                 />
-              </View>
+              )}
               <TextInput
                 style={[modalStyles.input, { minHeight: 120 }]}
                 placeholder="Escreva o relatório do aluno para esta data..."
