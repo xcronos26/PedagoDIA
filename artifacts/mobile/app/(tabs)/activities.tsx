@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   ScrollView,
   Linking,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from 'react-native';
 import { DataLoadingWrapper } from '@/components/DataLoadingWrapper';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -113,6 +114,10 @@ export default function ActivitiesScreen() {
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [activityAction, setActivityAction] = useState<ActivityAction>(null);
   const [newSubjectName, setNewSubjectName] = useState('');
+  const [addingSaving, setAddingSaving] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [loadingDelivery, setLoadingDelivery] = useState<Set<string>>(new Set());
+  const [loadingSeen, setLoadingSeen] = useState<Set<string>>(new Set());
 
   const [form, setForm] = useState({ ...emptyForm });
   const [editForm, setEditForm] = useState({ ...emptyForm });
@@ -131,31 +136,41 @@ export default function ActivitiesScreen() {
   }, [activities, selectedSubject]);
 
   const handleAdd = async () => {
-    if (!form.description.trim() || !form.date) return;
-    await addActivity({
-      subject: currentFormSubject,
-      type: form.type,
-      link: form.link || undefined,
-      date: form.date,
-      description: form.description,
-    });
-    setShowAddModal(false);
-    setForm({ ...emptyForm });
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (!form.description.trim() || !form.date || addingSaving) return;
+    setAddingSaving(true);
+    try {
+      await addActivity({
+        subject: currentFormSubject,
+        type: form.type,
+        link: form.link || undefined,
+        date: form.date,
+        description: form.description,
+      });
+      setShowAddModal(false);
+      setForm({ ...emptyForm });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } finally {
+      setAddingSaving(false);
+    }
   };
 
   const handleSaveEdit = async () => {
     if (!activityAction || activityAction.mode !== 'edit') return;
-    if (!editForm.description.trim() || !editForm.date) return;
-    await updateActivity(activityAction.activity.id, {
-      subject: currentEditSubject,
-      type: editForm.type,
-      link: editForm.link || undefined,
-      date: editForm.date,
-      description: editForm.description,
-    });
-    setActivityAction(null);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (!editForm.description.trim() || !editForm.date || editSaving) return;
+    setEditSaving(true);
+    try {
+      await updateActivity(activityAction.activity.id, {
+        subject: currentEditSubject,
+        type: editForm.type,
+        link: editForm.link || undefined,
+        date: editForm.date,
+        description: editForm.description,
+      });
+      setActivityAction(null);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const handleAddSubject = async () => {
@@ -407,16 +422,24 @@ export default function ActivitiesScreen() {
               />
 
               <View style={styles.modalButtons}>
-                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowAddModal(false)} activeOpacity={0.8}>
+                <TouchableOpacity
+                  style={[styles.modalCancelBtn, addingSaving && styles.btnDisabled]}
+                  onPress={() => setShowAddModal(false)}
+                  activeOpacity={0.8}
+                  disabled={addingSaving}
+                >
                   <Text style={styles.modalCancelText}>Cancelar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.modalConfirmBtn, !form.description.trim() && styles.btnDisabled]}
+                  style={[styles.modalConfirmBtn, (!form.description.trim() || addingSaving) && styles.btnDisabled]}
                   onPress={handleAdd}
                   activeOpacity={0.85}
-                  disabled={!form.description.trim()}
+                  disabled={!form.description.trim() || addingSaving}
                 >
-                  <Text style={styles.modalConfirmText}>Adicionar</Text>
+                  {addingSaving
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <Text style={styles.modalConfirmText}>Adicionar</Text>
+                  }
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -544,16 +567,24 @@ export default function ActivitiesScreen() {
               />
 
               <View style={styles.modalButtons}>
-                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setActivityAction(null)} activeOpacity={0.8}>
+                <TouchableOpacity
+                  style={[styles.modalCancelBtn, editSaving && styles.btnDisabled]}
+                  onPress={() => setActivityAction(null)}
+                  activeOpacity={0.8}
+                  disabled={editSaving}
+                >
                   <Text style={styles.modalCancelText}>Cancelar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.modalConfirmBtn, !editForm.description.trim() && styles.btnDisabled]}
+                  style={[styles.modalConfirmBtn, (!editForm.description.trim() || editSaving) && styles.btnDisabled]}
                   onPress={handleSaveEdit}
                   activeOpacity={0.85}
-                  disabled={!editForm.description.trim()}
+                  disabled={!editForm.description.trim() || editSaving}
                 >
-                  <Text style={styles.modalConfirmText}>Salvar</Text>
+                  {editSaving
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <Text style={styles.modalConfirmText}>Salvar</Text>
+                  }
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -621,30 +652,59 @@ export default function ActivitiesScreen() {
                   renderItem={({ item }) => {
                     const delivered = isDelivered(item.id);
                     const seen = isSeen(item.id);
+                    const deliveryKey = `${item.id}-d`;
+                    const seenKey = `${item.id}-s`;
+                    const isDeliveryLoading = loadingDelivery.has(deliveryKey);
+                    const isSeenLoading = loadingSeen.has(seenKey);
+
+                    const handleToggleDelivery = async () => {
+                      if (isDeliveryLoading) return;
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setLoadingDelivery(prev => new Set(prev).add(deliveryKey));
+                      try {
+                        await toggleDelivery(selectedActivity.id, item.id);
+                      } finally {
+                        setLoadingDelivery(prev => { const next = new Set(prev); next.delete(deliveryKey); return next; });
+                      }
+                    };
+
+                    const handleToggleSeen = async () => {
+                      if (isSeenLoading) return;
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setLoadingSeen(prev => new Set(prev).add(seenKey));
+                      try {
+                        await toggleSeen(selectedActivity.id, item.id);
+                      } finally {
+                        setLoadingSeen(prev => { const next = new Set(prev); next.delete(seenKey); return next; });
+                      }
+                    };
+
                     return (
                       <View style={styles.deliveryRow}>
                         <Text style={styles.deliveryStudentName} numberOfLines={1}>{item.name}</Text>
                         <View style={styles.deliveryActions}>
                           <TouchableOpacity
-                            style={[styles.deliveryActionBtn, delivered ? styles.deliveryActionDelivered : styles.deliveryActionEmpty]}
-                            onPress={() => {
-                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                              toggleDelivery(selectedActivity.id, item.id);
-                            }}
+                            style={[styles.deliveryActionBtn, delivered ? styles.deliveryActionDelivered : styles.deliveryActionEmpty, isDeliveryLoading && { opacity: 0.6 }]}
+                            onPress={handleToggleDelivery}
                             activeOpacity={0.8}
+                            disabled={isDeliveryLoading}
                           >
-                            <Ionicons name={delivered ? 'checkmark' : 'checkmark-outline'} size={14} color={delivered ? Colors.success : Colors.textTertiary} />
+                            {isDeliveryLoading
+                              ? <ActivityIndicator size="small" color={Colors.success} style={{ width: 14, height: 14 }} />
+                              : <Ionicons name={delivered ? 'checkmark' : 'checkmark-outline'} size={14} color={delivered ? Colors.success : Colors.textTertiary} />
+                            }
                             <Text style={[styles.deliveryActionLabel, delivered && { color: Colors.success }]}>Entregue</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
-                            style={[styles.deliveryActionBtn, seen ? styles.deliveryActionSeen : styles.deliveryActionEmpty]}
-                            onPress={() => {
-                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                              toggleSeen(selectedActivity.id, item.id);
-                            }}
+                            style={[styles.deliveryActionBtn, seen ? styles.deliveryActionSeen : styles.deliveryActionEmpty, isSeenLoading && { opacity: 0.6 }]}
+                            onPress={handleToggleSeen}
                             activeOpacity={0.8}
+                            disabled={isSeenLoading}
                           >
-                            <Ionicons name={seen ? 'eye' : 'eye-outline'} size={14} color={seen ? Colors.primary : Colors.textTertiary} />
+                            {isSeenLoading
+                              ? <ActivityIndicator size="small" color={Colors.primary} style={{ width: 14, height: 14 }} />
+                              : <Ionicons name={seen ? 'eye' : 'eye-outline'} size={14} color={seen ? Colors.primary : Colors.textTertiary} />
+                            }
                             <Text style={[styles.deliveryActionLabel, seen && { color: Colors.primary }]}>Visto</Text>
                           </TouchableOpacity>
                         </View>

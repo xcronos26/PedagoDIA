@@ -9,6 +9,7 @@ import {
   Modal,
   TextInput,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from 'react-native';
 import { DataLoadingWrapper } from '@/components/DataLoadingWrapper';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -40,6 +41,7 @@ export default function DiaryScreen() {
   const [editTarget, setEditTarget] = useState<EditTarget>(null);
   const [justifyText, setJustifyText] = useState('');
   const [justifyMode, setJustifyMode] = useState(false);
+  const [saving, setSaving] = useState<'present' | 'absent' | 'justify' | null>(null);
 
   const today = getBrasiliaToday();
   const days = useMemo(() => getWeekDays(weekOffset), [weekOffset]);
@@ -81,23 +83,38 @@ export default function DiaryScreen() {
   };
 
   const handleSetPresent = async () => {
-    if (!editTarget) return;
-    await setAttendanceRecord(editTarget.studentId, editTarget.date, true);
-    setEditTarget(null);
+    if (!editTarget || saving) return;
+    setSaving('present');
+    try {
+      await setAttendanceRecord(editTarget.studentId, editTarget.date, true);
+      setEditTarget(null);
+    } finally {
+      setSaving(null);
+    }
   };
 
   const handleSetAbsent = async () => {
-    if (!editTarget) return;
-    await setAttendanceRecord(editTarget.studentId, editTarget.date, false);
-    setEditTarget(null);
+    if (!editTarget || saving) return;
+    setSaving('absent');
+    try {
+      await setAttendanceRecord(editTarget.studentId, editTarget.date, false);
+      setEditTarget(null);
+    } finally {
+      setSaving(null);
+    }
   };
 
   const handleJustify = async () => {
-    if (!editTarget || !justifyText.trim()) return;
-    await justifyAbsence(editTarget.studentId, editTarget.date, justifyText.trim());
-    setEditTarget(null);
-    setJustifyText('');
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (!editTarget || !justifyText.trim() || saving) return;
+    setSaving('justify');
+    try {
+      await justifyAbsence(editTarget.studentId, editTarget.date, justifyText.trim());
+      setEditTarget(null);
+      setJustifyText('');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } finally {
+      setSaving(null);
+    }
   };
 
   const handleDatePickerChange = (_: any, date?: Date) => {
@@ -296,22 +313,39 @@ export default function DiaryScreen() {
 
               {!justifyMode ? (
                 <>
-                  <TouchableOpacity style={[styles.editOption, styles.editPresent]} onPress={handleSetPresent} activeOpacity={0.85}>
-                    <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+                  <TouchableOpacity
+                    style={[styles.editOption, styles.editPresent, saving && styles.optionDisabled]}
+                    onPress={handleSetPresent}
+                    activeOpacity={0.85}
+                    disabled={!!saving}
+                  >
+                    {saving === 'present'
+                      ? <ActivityIndicator size="small" color={Colors.success} />
+                      : <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+                    }
                     <Text style={[styles.editOptionText, { color: Colors.success }]}>Marcar Presente</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.editOption, styles.editAbsent]} onPress={handleSetAbsent} activeOpacity={0.85}>
-                    <Ionicons name="close-circle" size={20} color={Colors.danger} />
+                  <TouchableOpacity
+                    style={[styles.editOption, styles.editAbsent, saving && styles.optionDisabled]}
+                    onPress={handleSetAbsent}
+                    activeOpacity={0.85}
+                    disabled={!!saving}
+                  >
+                    {saving === 'absent'
+                      ? <ActivityIndicator size="small" color={Colors.danger} />
+                      : <Ionicons name="close-circle" size={20} color={Colors.danger} />
+                    }
                     <Text style={[styles.editOptionText, { color: Colors.danger }]}>Marcar Falta</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.editOption, styles.editJustify]}
+                    style={[styles.editOption, styles.editJustify, saving && styles.optionDisabled]}
                     onPress={() => {
                       const rec = getRecord(editTarget!.studentId, editTarget!.date);
                       setJustifyText(rec?.justification ?? '');
                       setJustifyMode(true);
                     }}
                     activeOpacity={0.85}
+                    disabled={!!saving}
                   >
                     <Ionicons name="document-text-outline" size={20} color={Colors.warning} />
                     <Text style={[styles.editOptionText, { color: Colors.warning }]}>
@@ -336,16 +370,24 @@ export default function DiaryScreen() {
                     />
                   </ScrollView>
                   <View style={styles.justifyButtons}>
-                    <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setJustifyMode(false)} activeOpacity={0.8}>
+                    <TouchableOpacity
+                      style={[styles.modalCancelBtn, saving === 'justify' && styles.btnDisabled]}
+                      onPress={() => setJustifyMode(false)}
+                      activeOpacity={0.8}
+                      disabled={saving === 'justify'}
+                    >
                       <Text style={styles.modalCancelText}>Voltar</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.modalConfirmBtn, !justifyText.trim() && styles.btnDisabled]}
+                      style={[styles.modalConfirmBtn, (!justifyText.trim() || saving === 'justify') && styles.btnDisabled]}
                       onPress={handleJustify}
                       activeOpacity={0.85}
-                      disabled={!justifyText.trim()}
+                      disabled={!justifyText.trim() || saving === 'justify'}
                     >
-                      <Text style={styles.modalConfirmText}>Salvar</Text>
+                      {saving === 'justify'
+                        ? <ActivityIndicator size="small" color="#fff" />
+                        : <Text style={styles.modalConfirmText}>Salvar</Text>
+                      }
                     </TouchableOpacity>
                   </View>
                 </>
@@ -521,4 +563,5 @@ const styles = StyleSheet.create({
   },
   modalConfirmText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: '#fff' },
   btnDisabled: { opacity: 0.5 },
+  optionDisabled: { opacity: 0.6 },
 });
