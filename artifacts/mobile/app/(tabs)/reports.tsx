@@ -164,6 +164,7 @@ export default function ReportsScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [newReportContent, setNewReportContent] = useState('');
   const [savingReport, setSavingReport] = useState(false);
+  const [editingReport, setEditingReport] = useState<StudentReport | null>(null);
 
   const fetchPrivateReports = useCallback(async () => {
     if (!selectedStudent || !token) return;
@@ -207,6 +208,44 @@ export default function ReportsScreen() {
       Alert.alert('Erro', 'Não foi possível salvar o relatório.');
     } finally {
       setSavingReport(false);
+    }
+  };
+
+  const handleUpdateReport = async () => {
+    if (!selectedStudent || !token || !newReportContent.trim() || !editingReport) return;
+    const y = newReportDateObj.getFullYear();
+    const m = String(newReportDateObj.getMonth() + 1).padStart(2, '0');
+    const d = String(newReportDateObj.getDate()).padStart(2, '0');
+    const reportDate = `${y}-${m}-${d}`;
+    setSavingReport(true);
+    try {
+      await apiFetch(`/student-reports/${editingReport.id}`, {
+        method: 'PUT',
+        token,
+        body: JSON.stringify({ date: reportDate, content: newReportContent.trim() }),
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setNewReportModal(false);
+      setEditingReport(null);
+      setNewReportContent('');
+      setNewReportDateObj(new Date());
+      setShowDatePicker(false);
+      await fetchPrivateReports();
+    } catch {
+      Alert.alert('Erro', 'Não foi possível atualizar o relatório.');
+    } finally {
+      setSavingReport(false);
+    }
+  };
+
+  const handleDeleteReport = async (reportId: string) => {
+    if (!token) return;
+    try {
+      await apiFetch(`/student-reports/${reportId}`, { method: 'DELETE', token });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await fetchPrivateReports();
+    } catch {
+      Alert.alert('Erro', 'Não foi possível excluir o relatório.');
     }
   };
 
@@ -333,6 +372,7 @@ export default function ReportsScreen() {
             <TouchableOpacity
               style={styles.addReportBtn}
               onPress={() => {
+                setEditingReport(null);
                 setNewReportDateObj(new Date());
                 setShowDatePicker(false);
                 setNewReportContent('');
@@ -355,12 +395,48 @@ export default function ReportsScreen() {
               </View>
             ) : (
               privateReports.map(report => {
-                const [y, m, d] = report.date.split('-');
+                const [ry, rm, rd] = report.date.split('-');
                 return (
                   <View key={report.id} style={styles.reportCard}>
-                    <View style={styles.reportDateBadge}>
-                      <Ionicons name="calendar-outline" size={14} color={Colors.primary} />
-                      <Text style={styles.reportDateText}>{d}/{m}/{y}</Text>
+                    <View style={styles.reportCardHeader}>
+                      <View style={styles.reportDateBadge}>
+                        <Ionicons name="calendar-outline" size={14} color={Colors.primary} />
+                        <Text style={styles.reportDateText}>{rd}/{rm}/{ry}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                        <TouchableOpacity
+                          onPress={() => {
+                            const [y2, m2, d2] = report.date.split('-');
+                            const date = new Date(parseInt(y2), parseInt(m2) - 1, parseInt(d2));
+                            setEditingReport(report);
+                            setNewReportDateObj(date);
+                            setNewReportContent(report.content);
+                            setShowDatePicker(false);
+                            setNewReportModal(true);
+                          }}
+                          hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                          activeOpacity={0.7}
+                        >
+                          <Feather name="edit-2" size={15} color={Colors.textSecondary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            Alert.alert(
+                              'Excluir relatório',
+                              'Tem certeza que deseja excluir este relatório? Esta ação não pode ser desfeita.',
+                              [
+                                { text: 'Cancelar', style: 'cancel' },
+                                { text: 'Excluir', style: 'destructive', onPress: () => handleDeleteReport(report.id) },
+                              ]
+                            );
+                          }}
+                          hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                          activeOpacity={0.7}
+                        >
+                          <Feather name="trash-2" size={15} color={Colors.danger} />
+                        </TouchableOpacity>
+                      </View>
                     </View>
                     <Text style={styles.reportContent}>{report.content}</Text>
                   </View>
@@ -492,7 +568,7 @@ export default function ReportsScreen() {
           <TouchableOpacity style={modalStyles.overlay} activeOpacity={1} onPress={() => setNewReportModal(false)}>
             <View style={[modalStyles.card, { paddingBottom: insets.bottom + 16 }]} onStartShouldSetResponder={() => true}>
               <View style={modalStyles.handle} />
-              <Text style={modalStyles.title}>Novo Relatório</Text>
+              <Text style={modalStyles.title}>{editingReport ? 'Editar Relatório' : 'Novo Relatório'}</Text>
               <Text style={[modalStyles.subtitle, { marginBottom: 4 }]}>Visível apenas para o professor</Text>
               <TouchableOpacity
                 style={styles.reportDateRow}
@@ -528,12 +604,16 @@ export default function ReportsScreen() {
                 textAlignVertical="top"
               />
               <View style={modalStyles.buttons}>
-                <TouchableOpacity style={modalStyles.cancelBtn} onPress={() => setNewReportModal(false)} activeOpacity={0.8}>
+                <TouchableOpacity
+                  style={modalStyles.cancelBtn}
+                  onPress={() => { setNewReportModal(false); setEditingReport(null); }}
+                  activeOpacity={0.8}
+                >
                   <Text style={modalStyles.cancelBtnText}>Cancelar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[modalStyles.confirmBtn, (!newReportContent.trim() || savingReport) && modalStyles.btnDisabled]}
-                  onPress={handleSaveReport}
+                  onPress={editingReport ? handleUpdateReport : handleSaveReport}
                   activeOpacity={0.85}
                   disabled={!newReportContent.trim() || savingReport}
                 >
@@ -884,6 +964,9 @@ const styles = StyleSheet.create({
   reportCard: {
     backgroundColor: Colors.surface, borderRadius: 16, padding: 16,
     borderWidth: 1, borderColor: Colors.border, gap: 10,
+  },
+  reportCardHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   reportDateBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
