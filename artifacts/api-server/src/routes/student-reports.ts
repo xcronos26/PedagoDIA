@@ -85,4 +85,58 @@ router.post("/student-reports", requireAuth, async (req, res) => {
   }
 });
 
+router.put("/student-reports/:id", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { date, content } = req.body;
+    if (!date || typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      res.status(400).json({ error: "date é obrigatório no formato YYYY-MM-DD" });
+      return;
+    }
+    if (!content || typeof content !== "string" || content.trim() === "") {
+      res.status(400).json({ error: "content é obrigatório" });
+      return;
+    }
+    const [existing] = await db.select({ id: studentReportsTable.id })
+      .from(studentReportsTable)
+      .where(and(eq(studentReportsTable.id, id), eq(studentReportsTable.teacherId, req.teacherId!)));
+    if (!existing) {
+      res.status(404).json({ error: "Relatório não encontrado" });
+      return;
+    }
+    const [updated] = await db.update(studentReportsTable)
+      .set({ date, content: content.trim() })
+      .where(eq(studentReportsTable.id, id))
+      .returning();
+    res.json({
+      id: updated.id,
+      studentId: updated.studentId,
+      date: updated.date,
+      content: updated.content,
+      createdAt: updated.createdAt.toISOString(),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error updating student report");
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
+router.delete("/student-reports/:id", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [existing] = await db.select({ id: studentReportsTable.id, studentId: studentReportsTable.studentId })
+      .from(studentReportsTable)
+      .where(and(eq(studentReportsTable.id, id), eq(studentReportsTable.teacherId, req.teacherId!)));
+    if (!existing) {
+      res.status(404).json({ error: "Relatório não encontrado" });
+      return;
+    }
+    await db.delete(studentReportsTable).where(eq(studentReportsTable.id, id));
+    res.status(204).send();
+  } catch (err) {
+    req.log.error({ err }, "Error deleting student report");
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
 export default router;

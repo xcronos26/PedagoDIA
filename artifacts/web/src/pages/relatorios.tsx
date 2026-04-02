@@ -7,8 +7,8 @@ import { useActivities } from "@/hooks/use-activities";
 import { useAllDeliveries } from "@/hooks/use-deliveries";
 import { useJustifyAbsence } from "@/hooks/use-attendance";
 import { useGenerateParentToken } from "@/hooks/use-parent-token";
-import { useStudentReports, useCreateStudentReport } from "@/hooks/use-student-reports";
-import { BarChart3, TrendingUp, CheckCircle2, XCircle, Search, User as UserIcon, BookOpen, Calendar, AlertCircle, Edit3, Eye, FileText, Link as LinkIcon, ExternalLink, Share2, Copy, Printer } from "lucide-react";
+import { useStudentReports, useCreateStudentReport, useUpdateStudentReport, useDeleteStudentReport, type StudentReport } from "@/hooks/use-student-reports";
+import { BarChart3, TrendingUp, CheckCircle2, XCircle, Search, User as UserIcon, BookOpen, Calendar, AlertCircle, Edit3, Eye, FileText, Link as LinkIcon, ExternalLink, Share2, Copy, Printer, Pencil, Trash2 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -39,10 +39,14 @@ export default function Relatorios() {
   const [reportModal, setReportModal] = useState(false);
   const [reportDate, setReportDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [reportContent, setReportContent] = useState('');
-  
+  const [editingReport, setEditingReport] = useState<StudentReport | null>(null);
+  const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
+
   const generateParentToken = useGenerateParentToken();
   const { data: studentReports } = useStudentReports(selectedStudentId || null);
   const createStudentReport = useCreateStudentReport();
+  const updateStudentReport = useUpdateStudentReport();
+  const deleteStudentReport = useDeleteStudentReport();
 
   const filteredStudents = useMemo(() => {
     if (!students) return [];
@@ -439,7 +443,7 @@ export default function Relatorios() {
                   <FileText className="w-5 h-5 text-primary" /> Relatórios do Professor
                 </h3>
                 <button
-                  onClick={() => { setReportDate(new Date().toISOString().split('T')[0]); setReportContent(''); setReportModal(true); }}
+                  onClick={() => { setEditingReport(null); setReportDate(new Date().toISOString().split('T')[0]); setReportContent(''); setReportModal(true); }}
                   className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors flex items-center gap-2 font-medium text-sm"
                 >
                   + Adicionar relatório
@@ -456,10 +460,57 @@ export default function Relatorios() {
               ) : (
                 <div className="space-y-4">
                   {studentReports.map(report => (
-                    <div key={report.id} className="p-4 rounded-xl border border-border/50 bg-muted/10">
-                      <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2">
-                        {format(parseISO(report.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                      </p>
+                    <div key={report.id} className="p-4 rounded-xl border border-border/50 bg-muted/10 group">
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <p className="text-xs font-bold text-primary uppercase tracking-wider">
+                          {format(parseISO(report.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                        </p>
+                        {deletingReportId === report.id ? (
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="text-destructive font-medium">Excluir?</span>
+                            <button
+                              onClick={() => {
+                                deleteStudentReport.mutate(
+                                  { id: report.id, studentId: selectedStudentId },
+                                  { onSuccess: () => setDeletingReportId(null) }
+                                );
+                              }}
+                              disabled={deleteStudentReport.isPending}
+                              className="px-2.5 py-1 rounded-lg bg-destructive text-white text-xs font-bold hover:bg-destructive/90 disabled:opacity-50 transition-colors"
+                            >
+                              {deleteStudentReport.isPending ? '...' : 'Sim'}
+                            </button>
+                            <button
+                              onClick={() => setDeletingReportId(null)}
+                              className="px-2.5 py-1 rounded-lg bg-muted text-muted-foreground text-xs font-bold hover:bg-muted/80 transition-colors"
+                            >
+                              Não
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => {
+                                setEditingReport(report);
+                                setReportDate(report.date);
+                                setReportContent(report.content);
+                                setReportModal(true);
+                              }}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-primary transition-colors"
+                              title="Editar relatório"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setDeletingReportId(report.id)}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                              title="Excluir relatório"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
                       <p className="text-foreground leading-relaxed whitespace-pre-wrap">{report.content}</p>
                     </div>
                   ))}
@@ -555,14 +606,14 @@ export default function Relatorios() {
         )}
       </div>
 
-      {/* Report Creation Modal */}
+      {/* Report Create / Edit Modal */}
       {reportModal && selectedStudentId && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-card rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-border/50">
               <h2 className="text-2xl font-display font-bold text-foreground flex items-center gap-2">
                 <FileText className="w-6 h-6 text-primary" />
-                Novo Relatório
+                {editingReport ? 'Editar Relatório' : 'Novo Relatório'}
               </h2>
               <p className="text-muted-foreground mt-1">Relatório privado — visível apenas para o professor</p>
             </div>
@@ -589,7 +640,7 @@ export default function Relatorios() {
             </div>
             <div className="p-6 border-t border-border/50 flex gap-3 justify-end">
               <button
-                onClick={() => setReportModal(false)}
+                onClick={() => { setReportModal(false); setEditingReport(null); setReportContent(''); }}
                 className="px-6 py-3 rounded-xl font-bold text-foreground bg-muted/40 hover:bg-muted/60 transition-colors"
               >
                 Cancelar
@@ -597,21 +648,36 @@ export default function Relatorios() {
               <button
                 onClick={() => {
                   if (!reportContent.trim() || !reportDate) return;
-                  createStudentReport.mutate({
-                    studentId: selectedStudentId,
-                    date: reportDate,
-                    content: reportContent.trim(),
-                  }, {
-                    onSuccess: () => {
-                      setReportModal(false);
-                      setReportContent('');
-                    }
-                  });
+                  if (editingReport) {
+                    updateStudentReport.mutate({
+                      id: editingReport.id,
+                      studentId: selectedStudentId,
+                      date: reportDate,
+                      content: reportContent.trim(),
+                    }, {
+                      onSuccess: () => {
+                        setReportModal(false);
+                        setEditingReport(null);
+                        setReportContent('');
+                      }
+                    });
+                  } else {
+                    createStudentReport.mutate({
+                      studentId: selectedStudentId,
+                      date: reportDate,
+                      content: reportContent.trim(),
+                    }, {
+                      onSuccess: () => {
+                        setReportModal(false);
+                        setReportContent('');
+                      }
+                    });
+                  }
                 }}
-                disabled={!reportContent.trim() || !reportDate || createStudentReport.isPending}
+                disabled={!reportContent.trim() || !reportDate || createStudentReport.isPending || updateStudentReport.isPending}
                 className="px-6 py-3 rounded-xl font-bold text-white bg-primary hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
-                {createStudentReport.isPending ? 'Salvando...' : 'Salvar'}
+                {(createStudentReport.isPending || updateStudentReport.isPending) ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
           </div>

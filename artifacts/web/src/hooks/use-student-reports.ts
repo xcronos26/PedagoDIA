@@ -30,3 +30,28 @@ export function useCreateStudentReport() {
     },
   });
 }
+
+export function useUpdateStudentReport() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, date, content }: { id: string; date: string; content: string; studentId: string }) =>
+      apiFetch(`/student-reports/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ date, content }),
+      }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['student-reports', variables.studentId] });
+    },
+  });
+}
+
+export function useDeleteStudentReport() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id }: { id: string; studentId: string }) =>
+      apiFetch(`/student-reports/${id}`, { method: 'DELETE' }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['student-reports', variables.studentId] });
+    },
+  });
+}

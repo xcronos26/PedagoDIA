@@ -75,6 +75,7 @@ export default function PlanningScreen() {
   const [descEdits, setDescEdits] = useState<Record<string, string>>({});
   const [savingDesc, setSavingDesc] = useState<Record<string, boolean>>({});
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [expandedDay, setExpandedDay] = useState<string | null>(null);
 
   const mondayISO = toISO(monday);
 
@@ -130,6 +131,16 @@ export default function PlanningScreen() {
     setDescEdits(prev => ({ ...prev, [dateStr]: text }));
     if (debounceTimers.current[dateStr]) clearTimeout(debounceTimers.current[dateStr]);
     debounceTimers.current[dateStr] = setTimeout(() => saveDescription(dateStr, text), 1500);
+  };
+
+  const handleDescBlur = (dateStr: string) => {
+    if (debounceTimers.current[dateStr]) {
+      clearTimeout(debounceTimers.current[dateStr]);
+      delete debounceTimers.current[dateStr];
+    }
+    const text = getDescValue(dateStr);
+    saveDescription(dateStr, text);
+    setExpandedDay(null);
   };
 
   const saveDescription = async (dateStr: string, text: string) => {
@@ -318,15 +329,33 @@ export default function PlanningScreen() {
               {/* Description */}
               <View style={styles.descBlock}>
                 <Text style={styles.sectionLabel}>descritivo</Text>
-                <TextInput
-                  style={styles.descInput}
-                  value={desc}
-                  onChangeText={text => handleDescChange(dateStr, text)}
-                  placeholder="nada planejado"
-                  placeholderTextColor={Colors.textTertiary}
-                  multiline
-                  textAlignVertical="top"
-                />
+                {expandedDay === dateStr ? (
+                  <TextInput
+                    style={[styles.descInput, styles.descInputExpanded]}
+                    value={desc}
+                    onChangeText={text => handleDescChange(dateStr, text)}
+                    onBlur={() => handleDescBlur(dateStr)}
+                    placeholder="nada planejado"
+                    placeholderTextColor={Colors.textTertiary}
+                    multiline
+                    textAlignVertical="top"
+                    autoFocus
+                  />
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => setExpandedDay(dateStr)}
+                    activeOpacity={0.7}
+                    style={styles.descCollapsed}
+                  >
+                    <Text
+                      style={[styles.descText, !desc && styles.descPlaceholder]}
+                      numberOfLines={2}
+                      ellipsizeMode="tail"
+                    >
+                      {desc || 'nada planejado'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               {/* Activities */}
@@ -590,6 +619,29 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     minHeight: 52,
     paddingTop: 2,
+  },
+  descInputExpanded: {
+    minHeight: 72,
+    borderWidth: 1,
+    borderColor: Colors.primary + '55',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    backgroundColor: Colors.primary + '08',
+  },
+  descCollapsed: {
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+    minHeight: 40,
+  },
+  descText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    color: Colors.text,
+    lineHeight: 20,
+  },
+  descPlaceholder: {
+    color: Colors.textTertiary,
   },
 
   activitiesBlock: {
