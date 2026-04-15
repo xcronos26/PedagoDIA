@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { CalendarDays, CheckSquare, BookOpen, BarChart3, LogOut, GraduationCap, LayoutDashboard, ClipboardList } from "lucide-react";
+import { CalendarDays, CheckSquare, BookOpen, BarChart3, LogOut, GraduationCap, LayoutDashboard, ClipboardList, Heart } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -30,6 +30,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { name: "Atividades", href: "/atividades", icon: BookOpen },
     { name: "Planejamento", href: "/planejamento", icon: ClipboardList },
     { name: "Relatórios", href: "/relatorios", icon: BarChart3 },
+    { name: "Sobre", href: "/sobre", icon: Heart },
   ];
 
   return (

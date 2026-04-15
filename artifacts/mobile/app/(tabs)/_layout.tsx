@@ -5,12 +5,16 @@ import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { Colors } from "@/constants/colors";
 
 function NativeTabLayout() {
   return (
     <NativeTabs>
+      <NativeTabs.Trigger name="menu">
+        <Icon sf={{ default: "square.grid.2x2", selected: "square.grid.2x2.fill" }} />
+        <Label>Menu</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: "checkmark.circle", selected: "checkmark.circle.fill" }} />
         <Label>Chamada</Label>
@@ -26,10 +30,6 @@ function NativeTabLayout() {
       <NativeTabs.Trigger name="planning">
         <Icon sf={{ default: "calendar.badge.plus", selected: "calendar.badge.plus" }} />
         <Label>Planejamento</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="reports">
-        <Icon sf={{ default: "chart.bar", selected: "chart.bar.fill" }} />
-        <Label>Relatórios</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -65,6 +65,18 @@ function ClassicTabLayout() {
           ) : null,
       }}
     >
+      <Tabs.Screen
+        name="menu"
+        options={{
+          title: "Menu",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="square.grid.2x2.fill" tintColor={color} size={24} />
+            ) : (
+              <Ionicons name="grid-outline" size={24} color={color} />
+            ),
+        }}
+      />
       <Tabs.Screen
         name="index"
         options={{
@@ -113,16 +125,19 @@ function ClassicTabLayout() {
             ),
         }}
       />
+      {/* Hidden tabs — accessible via navigation but not shown in tab bar */}
       <Tabs.Screen
         name="reports"
         options={{
+          href: null,
           title: "Relatórios",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="chart.bar.fill" tintColor={color} size={24} />
-            ) : (
-              <Ionicons name="bar-chart-outline" size={22} color={color} />
-            ),
+        }}
+      />
+      <Tabs.Screen
+        name="sobre"
+        options={{
+          href: null,
+          title: "Sobre",
         }}
       />
     </Tabs>

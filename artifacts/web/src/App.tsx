@@ -17,6 +17,7 @@ import Atividades from "@/pages/atividades";
 import Relatorios from "@/pages/relatorios";
 import Planejamento from "@/pages/planejamento";
 import RelatorioCompartilhado from "@/pages/relatorio-compartilhado";
+import Sobre from "@/pages/sobre";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -63,6 +64,7 @@ function Router() {
             <Route path="/atividades"><ProtectedRoute component={Atividades} /></Route>
             <Route path="/relatorios"><ProtectedRoute component={Relatorios} /></Route>
             <Route path="/planejamento"><ProtectedRoute component={Planejamento} /></Route>
+            <Route path="/sobre"><ProtectedRoute component={Sobre} /></Route>
             <Route component={NotFound} />
           </Switch>
         </Layout>
