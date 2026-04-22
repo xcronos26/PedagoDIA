@@ -7,10 +7,24 @@ import { apiFetch } from '@/utils/api';
 const TOKEN_KEY = 'pedagogia_token';
 const TEACHER_KEY = 'pedagogia_teacher';
 
+export type DayEntry = {
+  subject: string;
+  turma?: string;
+};
+
+export type WeeklySchedule = {
+  segunda: DayEntry[];
+  terca: DayEntry[];
+  quarta: DayEntry[];
+  quinta: DayEntry[];
+  sexta: DayEntry[];
+};
+
 export type Teacher = {
   id: string;
   name: string;
   email: string;
+  weeklySchedule?: WeeklySchedule | null;
 };
 
 interface AuthContextValue {
@@ -21,7 +35,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  updateProfile: (name: string) => Promise<void>;
+  updateProfile: (name: string, weeklySchedule?: WeeklySchedule | null) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -107,13 +121,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTeacher(null);
   }, []);
 
-  const updateProfile = useCallback(async (name: string) => {
+  const updateProfile = useCallback(async (name: string, weeklySchedule?: WeeklySchedule | null) => {
     if (!token) return;
     const trimmed = name.trim();
     if (!trimmed) return;
+    const body: Record<string, unknown> = { name: trimmed };
+    if (weeklySchedule !== undefined) body.weeklySchedule = weeklySchedule;
     const data = await apiFetch<{ teacher: Teacher }>('/auth/profile', {
       method: 'PATCH',
-      body: JSON.stringify({ name: trimmed }),
+      body: JSON.stringify(body),
       token,
     });
     const updated = data.teacher;

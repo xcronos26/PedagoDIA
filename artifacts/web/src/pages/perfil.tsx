@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useAuth, type WeeklySchedule } from "@/hooks/use-auth";
+import { useAuth, type WeeklySchedule, type DayEntry } from "@/hooks/use-auth";
 import { User, Mail, Save, Loader2, Check, CalendarDays, Plus, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { clsx, type ClassValue } from "clsx";
@@ -30,107 +30,152 @@ function scheduleIsEmpty(s: WeeklySchedule) {
   return DAYS.every(d => s[d.key].length === 0);
 }
 
-function DaySubjectEditor({
+function entryLabel(e: DayEntry) {
+  return e.turma ? `${e.subject} — ${e.turma}` : e.subject;
+}
+
+function DayEntryEditor({
   day,
-  subjects,
+  entries,
   onChange,
 }: {
   day: { key: keyof WeeklySchedule; label: string };
-  subjects: string[];
-  onChange: (subjects: string[]) => void;
+  entries: DayEntry[];
+  onChange: (entries: DayEntry[]) => void;
 }) {
-  const [input, setInput] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
+  const subjectRef = useRef<HTMLInputElement>(null);
+  const [subject, setSubject] = useState("");
+  const [turma, setTurma] = useState("");
+  const [showTurma, setShowTurma] = useState(false);
 
-  const addSubject = (val: string) => {
-    const trimmed = val.trim();
-    if (!trimmed) return;
-    if (subjects.some(s => s.toLowerCase() === trimmed.toLowerCase())) return;
-    onChange([...subjects, trimmed]);
-    setInput("");
+  const addEntry = () => {
+    const s = subject.trim();
+    if (!s) return;
+    const entry: DayEntry = { subject: s, ...(turma.trim() ? { turma: turma.trim() } : {}) };
+    onChange([...entries, entry]);
+    setSubject("");
+    setTurma("");
+    setShowTurma(false);
+    subjectRef.current?.focus();
   };
 
-  const removeSubject = (idx: number) => {
-    onChange(subjects.filter((_, i) => i !== idx));
+  const removeEntry = (idx: number) => {
+    onChange(entries.filter((_, i) => i !== idx));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      addSubject(input);
+      if (showTurma && subject.trim()) {
+        addEntry();
+      } else if (subject.trim()) {
+        addEntry();
+      }
     }
   };
 
   const filteredSuggestions = SUBJECT_SUGGESTIONS.filter(
-    s => !subjects.includes(s) && s.toLowerCase().includes(input.toLowerCase())
+    s => !entries.some(e => e.subject.toLowerCase() === s.toLowerCase()) &&
+      s.toLowerCase().includes(subject.toLowerCase())
   );
 
   return (
     <div className="space-y-2">
       <p className="text-sm font-bold text-foreground">{day.label}</p>
-      <div className="flex flex-wrap gap-1.5 min-h-[32px]">
-        {subjects.map((s, i) => (
+
+      <div className="flex flex-wrap gap-1.5 min-h-[28px]">
+        {entries.map((e, i) => (
           <span
             key={i}
             className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary/10 text-primary rounded-lg text-xs font-semibold"
           >
-            {s}
+            <span>{e.subject}</span>
+            {e.turma && (
+              <span className="text-primary/60 font-normal">· {e.turma}</span>
+            )}
             <button
               type="button"
-              onClick={() => removeSubject(i)}
-              className="hover:text-destructive transition-colors"
-              aria-label={`Remover ${s}`}
+              onClick={() => removeEntry(i)}
+              className="hover:text-destructive transition-colors ml-0.5"
+              aria-label={`Remover ${entryLabel(e)}`}
             >
               <X className="w-3 h-3" />
             </button>
           </span>
         ))}
-        {subjects.length === 0 && (
+        {entries.length === 0 && (
           <span className="text-xs text-muted-foreground italic">Nenhuma matéria</span>
         )}
       </div>
 
-      <div className="flex gap-2 items-center">
-        <input
-          ref={inputRef}
-          type="text"
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Adicionar matéria..."
-          className="flex-1 px-3 py-2 text-sm bg-background border border-border rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none text-foreground transition-all"
-          list={`suggestions-${day.key}`}
-        />
-        <datalist id={`suggestions-${day.key}`}>
-          {filteredSuggestions.map(s => (
-            <option key={s} value={s} />
-          ))}
-        </datalist>
-        <button
-          type="button"
-          onClick={() => addSubject(input)}
-          disabled={!input.trim()}
-          className="p-2 rounded-lg bg-primary text-primary-foreground disabled:opacity-40 hover:bg-primary/90 transition-colors"
-          aria-label="Adicionar"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
-      </div>
-
-      {input.trim() && filteredSuggestions.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {filteredSuggestions.slice(0, 5).map(s => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => { addSubject(s); inputRef.current?.focus(); }}
-              className="text-xs px-2 py-0.5 border border-border rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {s}
-            </button>
-          ))}
+      <div className="space-y-1.5">
+        <div className="flex gap-2 items-center">
+          <input
+            ref={subjectRef}
+            type="text"
+            value={subject}
+            onChange={e => setSubject(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Matéria..."
+            className="flex-1 px-3 py-2 text-sm bg-background border border-border rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none text-foreground transition-all"
+            list={`suggestions-${day.key}`}
+          />
+          <datalist id={`suggestions-${day.key}`}>
+            {filteredSuggestions.map(s => (
+              <option key={s} value={s} />
+            ))}
+          </datalist>
+          <button
+            type="button"
+            onClick={() => setShowTurma(v => !v)}
+            title="Adicionar turma"
+            className={cn(
+              "px-2.5 py-2 rounded-lg border text-xs font-semibold transition-colors",
+              showTurma
+                ? "bg-primary/10 border-primary text-primary"
+                : "bg-muted/40 border-border text-muted-foreground hover:bg-muted/70"
+            )}
+          >
+            + Turma
+          </button>
+          <button
+            type="button"
+            onClick={addEntry}
+            disabled={!subject.trim()}
+            className="p-2 rounded-lg bg-primary text-primary-foreground disabled:opacity-40 hover:bg-primary/90 transition-colors"
+            aria-label="Adicionar"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
         </div>
-      )}
+
+        {showTurma && (
+          <input
+            type="text"
+            value={turma}
+            onChange={e => setTurma(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Turma (ex: 4º A, 3º B)..."
+            className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none text-foreground transition-all"
+            autoFocus
+          />
+        )}
+
+        {subject.trim() && filteredSuggestions.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {filteredSuggestions.slice(0, 5).map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => { setSubject(s); subjectRef.current?.focus(); }}
+                className="text-xs px-2 py-0.5 border border-border rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -177,13 +222,11 @@ export default function Perfil() {
     }
   };
 
-  const updateDaySubjects = (key: keyof WeeklySchedule, subjects: string[]) => {
-    setSchedule(prev => ({ ...prev, [key]: subjects }));
+  const updateDayEntries = (key: keyof WeeklySchedule, entries: DayEntry[]) => {
+    setSchedule(prev => ({ ...prev, [key]: entries }));
   };
 
-  const clearSchedule = () => {
-    setSchedule(EMPTY_SCHEDULE);
-  };
+  const clearSchedule = () => setSchedule(EMPTY_SCHEDULE);
 
   return (
     <div className="p-4 md:p-8 max-w-2xl mx-auto space-y-6 animate-slide-up">
@@ -244,7 +287,7 @@ export default function Perfil() {
                 Grade Semanal
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Opcional — informe quais matérias você dá em cada dia para que a IA monte o plano semanal respeitando sua grade.
+                Opcional — informe matéria e turma de cada dia para que a IA monte o plano semanal respeitando sua grade.
               </p>
             </div>
             {!scheduleIsEmpty(schedule) && (
@@ -261,10 +304,10 @@ export default function Perfil() {
           <div className="divide-y divide-border/60 space-y-0">
             {DAYS.map((day, i) => (
               <div key={day.key} className={cn("py-4", i === 0 && "pt-0", i === DAYS.length - 1 && "pb-0")}>
-                <DaySubjectEditor
+                <DayEntryEditor
                   day={day}
-                  subjects={schedule[day.key]}
-                  onChange={(subjects) => updateDaySubjects(day.key, subjects)}
+                  entries={schedule[day.key]}
+                  onChange={(entries) => updateDayEntries(day.key, entries)}
                 />
               </div>
             ))}

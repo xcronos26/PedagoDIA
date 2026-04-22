@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,26 +16,170 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/colors';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, type WeeklySchedule, type DayEntry } from '@/context/AuthContext';
+
+const DAYS: { key: keyof WeeklySchedule; label: string }[] = [
+  { key: 'segunda', label: 'Segunda-feira' },
+  { key: 'terca', label: 'Terça-feira' },
+  { key: 'quarta', label: 'Quarta-feira' },
+  { key: 'quinta', label: 'Quinta-feira' },
+  { key: 'sexta', label: 'Sexta-feira' },
+];
+
+const SUBJECT_SUGGESTIONS = [
+  'Português', 'Matemática', 'Ciências', 'História', 'Geografia',
+  'Artes', 'Educação Física', 'Inglês', 'Religião', 'Informática',
+];
+
+const EMPTY_SCHEDULE: WeeklySchedule = {
+  segunda: [], terca: [], quarta: [], quinta: [], sexta: [],
+};
+
+function scheduleIsEmpty(s: WeeklySchedule) {
+  return DAYS.every(d => s[d.key].length === 0);
+}
+
+type DayEditorProps = {
+  day: { key: keyof WeeklySchedule; label: string };
+  entries: DayEntry[];
+  onChange: (entries: DayEntry[]) => void;
+};
+
+function DayEntryRow({ entry, onRemove }: { entry: DayEntry; onRemove: () => void }) {
+  return (
+    <View style={st.chip}>
+      <Text style={st.chipSubject}>{entry.subject}</Text>
+      {entry.turma ? <Text style={st.chipTurma}> · {entry.turma}</Text> : null}
+      <TouchableOpacity onPress={onRemove} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }} style={{ marginLeft: 4 }}>
+        <Ionicons name="close" size={12} color={Colors.primary} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function DayEditor({ day, entries, onChange }: DayEditorProps) {
+  const [subject, setSubject] = useState('');
+  const [turma, setTurma] = useState('');
+  const [showTurma, setShowTurma] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const subjectRef = useRef<TextInput>(null);
+
+  const filtered = SUBJECT_SUGGESTIONS.filter(
+    s => !entries.some(e => e.subject.toLowerCase() === s.toLowerCase())
+      && s.toLowerCase().includes(subject.toLowerCase())
+  );
+
+  const addEntry = () => {
+    const s = subject.trim();
+    if (!s) return;
+    const entry: DayEntry = { subject: s, ...(turma.trim() ? { turma: turma.trim() } : {}) };
+    onChange([...entries, entry]);
+    setSubject('');
+    setTurma('');
+    setShowTurma(false);
+    setShowSuggestions(false);
+  };
+
+  return (
+    <View style={st.dayBlock}>
+      <Text style={st.dayLabel}>{day.label}</Text>
+
+      {entries.length > 0 && (
+        <View style={st.chipsRow}>
+          {entries.map((e, i) => (
+            <DayEntryRow key={i} entry={e} onRemove={() => onChange(entries.filter((_, j) => j !== i))} />
+          ))}
+        </View>
+      )}
+
+      <View style={st.inputRow}>
+        <TextInput
+          ref={subjectRef}
+          style={[st.inputSmall, { flex: 1 }]}
+          value={subject}
+          onChangeText={t => { setSubject(t); setShowSuggestions(t.length > 0); }}
+          placeholder="Matéria..."
+          placeholderTextColor={Colors.textTertiary}
+          returnKeyType={showTurma ? 'next' : 'done'}
+          onSubmitEditing={showTurma ? undefined : addEntry}
+          blurOnSubmit={!showTurma}
+        />
+        <TouchableOpacity
+          style={[st.turmaToggle, showTurma && st.turmaToggleActive]}
+          onPress={() => setShowTurma(v => !v)}
+          activeOpacity={0.8}
+        >
+          <Text style={[st.turmaToggleText, showTurma && { color: Colors.primary }]}>+Turma</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[st.addBtn, !subject.trim() && { opacity: 0.4 }]}
+          onPress={addEntry}
+          disabled={!subject.trim()}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="add" size={18} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      {showTurma && (
+        <TextInput
+          style={st.inputSmall}
+          value={turma}
+          onChangeText={setTurma}
+          placeholder="Turma (ex: 4º A, 3º B)..."
+          placeholderTextColor={Colors.textTertiary}
+          returnKeyType="done"
+          onSubmitEditing={addEntry}
+          autoFocus
+        />
+      )}
+
+      {showSuggestions && filtered.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            {filtered.slice(0, 5).map(s => (
+              <TouchableOpacity
+                key={s}
+                style={st.suggestion}
+                onPress={() => { setSubject(s); setShowSuggestions(false); subjectRef.current?.focus(); }}
+                activeOpacity={0.8}
+              >
+                <Text style={st.suggestionText}>{s}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+      )}
+    </View>
+  );
+}
 
 export default function PerfilScreen() {
   const insets = useSafeAreaInsets();
   const { teacher, updateProfile } = useAuth();
   const [name, setName] = useState(teacher?.name ?? '');
+  const [schedule, setSchedule] = useState<WeeklySchedule>(
+    teacher?.weeklySchedule ?? EMPTY_SCHEDULE
+  );
   const [saving, setSaving] = useState(false);
+  const [gradeExpanded, setGradeExpanded] = useState(false);
 
   const topPadding = Platform.OS === 'web' ? 40 : insets.top;
   const bottomPadding = Platform.OS === 'web' ? 40 : insets.bottom;
 
+  const hasNameChange = name.trim() !== '' && name.trim() !== teacher?.name;
+  const hasScheduleChange = JSON.stringify(schedule) !== JSON.stringify(teacher?.weeklySchedule ?? EMPTY_SCHEDULE);
+  const hasChanges = hasNameChange || hasScheduleChange;
+
   const handleSave = async () => {
-    if (!name.trim()) return;
-    if (name.trim() === teacher?.name) {
-      Alert.alert('Sem alterações', 'O nome não foi modificado.');
+    if (!name.trim() || !hasChanges) {
+      if (!hasChanges) Alert.alert('Sem alterações', 'Nenhuma informação foi modificada.');
       return;
     }
     setSaving(true);
     try {
-      await updateProfile(name.trim());
+      const scheduleToSave = scheduleIsEmpty(schedule) ? null : schedule;
+      await updateProfile(name.trim(), scheduleToSave);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert('Sucesso', 'Perfil atualizado com sucesso!');
     } catch (e: any) {
@@ -43,6 +187,10 @@ export default function PerfilScreen() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const updateDayEntries = (key: keyof WeeklySchedule, entries: DayEntry[]) => {
+    setSchedule(prev => ({ ...prev, [key]: entries }));
   };
 
   return (
@@ -77,6 +225,7 @@ export default function PerfilScreen() {
           <Text style={styles.avatarEmail}>{teacher?.email}</Text>
         </View>
 
+        {/* Informações pessoais */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Informações pessoais</Text>
 
@@ -92,7 +241,6 @@ export default function PerfilScreen() {
                 placeholderTextColor={Colors.textTertiary}
                 autoCapitalize="words"
                 returnKeyType="done"
-                onSubmitEditing={handleSave}
               />
             </View>
           </View>
@@ -110,27 +258,172 @@ export default function PerfilScreen() {
             </View>
             <Text style={styles.hint}>O e-mail não pode ser alterado</Text>
           </View>
-
-          <TouchableOpacity
-            style={[styles.saveButton, (!name.trim() || saving) && styles.buttonDisabled]}
-            onPress={handleSave}
-            activeOpacity={0.85}
-            disabled={!name.trim() || saving}
-          >
-            {saving ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="checkmark" size={20} color="#fff" />
-                <Text style={styles.saveButtonText}>Salvar alterações</Text>
-              </>
-            )}
-          </TouchableOpacity>
         </View>
+
+        {/* Grade Semanal */}
+        <View style={styles.card}>
+          <TouchableOpacity
+            style={styles.gradeHeader}
+            onPress={() => setGradeExpanded(v => !v)}
+            activeOpacity={0.8}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.sectionTitle}>Grade Semanal</Text>
+              <Text style={styles.hint}>
+                Opcional — matéria e turma por dia para a IA respeitar ao gerar planos.
+              </Text>
+            </View>
+            <Ionicons
+              name={gradeExpanded ? 'chevron-up' : 'chevron-down'}
+              size={20}
+              color={Colors.textSecondary}
+            />
+          </TouchableOpacity>
+
+          {gradeExpanded && (
+            <View style={{ gap: 4, marginTop: 12 }}>
+              {DAYS.map(day => (
+                <DayEditor
+                  key={day.key}
+                  day={day}
+                  entries={schedule[day.key]}
+                  onChange={entries => updateDayEntries(day.key, entries)}
+                />
+              ))}
+              {!scheduleIsEmpty(schedule) && (
+                <TouchableOpacity
+                  style={st.clearBtn}
+                  onPress={() => setSchedule(EMPTY_SCHEDULE)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={st.clearBtnText}>Limpar grade</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </View>
+
+        <TouchableOpacity
+          style={[styles.saveButton, (!hasChanges || saving) && styles.buttonDisabled]}
+          onPress={handleSave}
+          activeOpacity={0.85}
+          disabled={!hasChanges || saving}
+        >
+          {saving ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="checkmark" size={20} color="#fff" />
+              <Text style={styles.saveButtonText}>Salvar alterações</Text>
+            </>
+          )}
+        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
+
+const st = StyleSheet.create({
+  dayBlock: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    gap: 8,
+  },
+  dayLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: Colors.text,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  chipSubject: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    color: Colors.primary,
+  },
+  chipTurma: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: Colors.primary,
+    opacity: 0.7,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  inputSmall: {
+    backgroundColor: Colors.surfaceSecondary,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 14,
+    fontFamily: 'Inter_400Regular',
+    color: Colors.text,
+  },
+  turmaToggle: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceSecondary,
+  },
+  turmaToggleActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+  },
+  turmaToggleText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  addBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  suggestion: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+  },
+  suggestionText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  clearBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  clearBtnText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: Colors.textTertiary,
+    textDecorationLine: 'underline',
+  },
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -200,11 +493,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
+  gradeHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
   sectionTitle: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 16,
     color: Colors.text,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   field: {
     gap: 6,

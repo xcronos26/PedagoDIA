@@ -1,12 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { apiFetch } from '@/lib/api';
 
+export type DayEntry = {
+  subject: string;
+  turma?: string;
+};
+
 export type WeeklySchedule = {
-  segunda: string[];
-  terca: string[];
-  quarta: string[];
-  quinta: string[];
-  sexta: string[];
+  segunda: DayEntry[];
+  terca: DayEntry[];
+  quarta: DayEntry[];
+  quinta: DayEntry[];
+  sexta: DayEntry[];
 };
 
 export interface Teacher {

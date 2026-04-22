@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { requireAuth } from "../middlewares/auth";
-import type { WeeklySchedule } from "@workspace/db";
+import type { WeeklySchedule, DayEntry } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -51,6 +51,11 @@ Responda APENAS com JSON válido, sem markdown:
 }
 `.trim();
 
+function formatEntry(entry: DayEntry | string): string {
+  if (typeof entry === "string") return entry;
+  return entry.turma ? `${entry.subject} (${entry.turma})` : entry.subject;
+}
+
 function formatWeeklySchedule(schedule: WeeklySchedule): string {
   const days: Array<{ label: string; key: keyof WeeklySchedule }> = [
     { label: "Segunda-feira", key: "segunda" },
@@ -61,7 +66,7 @@ function formatWeeklySchedule(schedule: WeeklySchedule): string {
   ];
   const lines = days
     .filter(d => schedule[d.key] && schedule[d.key].length > 0)
-    .map(d => `  - ${d.label}: ${schedule[d.key].join(", ")}`);
+    .map(d => `  - ${d.label}: ${(schedule[d.key] as Array<DayEntry | string>).map(formatEntry).join(", ")}`);
   return lines.length > 0 ? lines.join("\n") : "";
 }
 
