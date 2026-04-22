@@ -95,10 +95,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 flex flex-col min-w-0 pb-20 md:pb-0 h-screen overflow-y-auto">
         {/* Mobile Header */}
         <header className="md:hidden bg-sidebar border-b border-border p-4 flex items-center justify-between sticky top-0 z-20 shadow-sm">
-          <div className="flex items-center gap-2 text-primary font-display font-bold text-xl">
+          <Link href="/" className="flex items-center gap-2 text-primary font-display font-bold text-xl">
             <GraduationCap className="w-6 h-6" />
             PedagoDIA
-          </div>
+          </Link>
           <div className="flex items-center gap-2">
             <Link href="/perfil" className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-sm">
               {user.name.charAt(0).toUpperCase()}
