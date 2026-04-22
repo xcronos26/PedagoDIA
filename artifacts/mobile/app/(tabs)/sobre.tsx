@@ -58,7 +58,7 @@ export default function SobreScreen() {
         {/* Logo & App Identity */}
         <View style={styles.logoWrap}>
           <Image
-            source={require('@/assets/images/icon.png')}
+            source={require('@/assets/images/logo.png')}
             style={styles.logo}
             resizeMode="contain"
           />
