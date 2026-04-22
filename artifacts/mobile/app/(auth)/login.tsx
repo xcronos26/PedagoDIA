@@ -14,9 +14,11 @@ import {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '@/constants/colors';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
+import { WELCOME_SEEN_KEY } from '@/app/bem-vinda';
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -37,8 +39,13 @@ export default function LoginScreen() {
     setError('');
     try {
       await login(email.trim(), password);
-      await loadData();
-      router.replace('/(tabs)');
+      const welcomeSeen = await AsyncStorage.getItem(WELCOME_SEEN_KEY);
+      if (welcomeSeen !== 'true') {
+        router.replace('/bem-vinda');
+      } else {
+        await loadData();
+        router.replace('/(tabs)');
+      }
     } catch (e: any) {
       setError(e?.message ?? 'Erro ao fazer login');
     } finally {
