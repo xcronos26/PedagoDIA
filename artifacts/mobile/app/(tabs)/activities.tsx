@@ -110,6 +110,11 @@ export default function ActivitiesScreen() {
     isLoaded, loadError, loadData,
   } = useApp();
 
+  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+
   const [deliveryClassId, setDeliveryClassId] = useState<string | null>(null);
 
   React.useEffect(() => {
@@ -122,11 +127,6 @@ export default function ActivitiesScreen() {
     if (!deliveryClassId) return students;
     return students.filter(s => s.classId === deliveryClassId);
   }, [students, deliveryClassId]);
-
-  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
-  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [activityAction, setActivityAction] = useState<ActivityAction>(null);
   const [newSubjectName, setNewSubjectName] = useState('');
   const [addingSaving, setAddingSaving] = useState(false);
