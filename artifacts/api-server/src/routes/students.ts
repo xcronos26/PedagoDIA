@@ -52,11 +52,14 @@ router.post("/students", requireAuth, async (req, res) => {
       return;
     }
 
-    if (classId) {
+    const resolvedClassId: string | null =
+      classId !== undefined && classId !== null ? String(classId).trim() || null : null;
+
+    if (resolvedClassId) {
       const [cls] = await db
         .select()
         .from(classesTable)
-        .where(and(eq(classesTable.id, classId), eq(classesTable.teacherId, req.teacherId!)));
+        .where(and(eq(classesTable.id, resolvedClassId), eq(classesTable.teacherId, req.teacherId!)));
       if (!cls) {
         res.status(400).json({ error: "Turma não encontrada" });
         return;
@@ -69,7 +72,7 @@ router.post("/students", requireAuth, async (req, res) => {
         id: generateId(),
         teacherId: req.teacherId!,
         name: name.trim(),
-        classId: classId ?? null,
+        classId: resolvedClassId,
       })
       .returning();
     res.status(201).json(formatStudent(student));
