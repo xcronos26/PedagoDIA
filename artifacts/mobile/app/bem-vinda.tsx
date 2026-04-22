@@ -11,11 +11,16 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '@/constants/colors';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
 
-const FEATURES = [
+export const WELCOME_SEEN_KEY = 'pedagogia_welcome_seen';
+
+type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+
+const FEATURES: { icon: IoniconsName; text: string }[] = [
   { icon: 'checkmark-circle-outline', text: 'Registre chamadas diárias com rapidez' },
   { icon: 'book-outline', text: 'Gerencie atividades e acompanhe entregas' },
   { icon: 'people-outline', text: 'Organize alunos por turma' },
@@ -31,6 +36,7 @@ export default function BemVindaScreen() {
 
   const handleComecar = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    await AsyncStorage.setItem(WELCOME_SEEN_KEY, 'true');
     await loadData();
     router.replace('/(tabs)');
   };
@@ -56,7 +62,7 @@ export default function BemVindaScreen() {
           {FEATURES.map((f, i) => (
             <View key={i} style={styles.featureRow}>
               <View style={styles.featureIcon}>
-                <Ionicons name={f.icon as any} size={22} color={Colors.primary} />
+                <Ionicons name={f.icon} size={22} color={Colors.primary} />
               </View>
               <Text style={styles.featureText}>{f.text}</Text>
             </View>
