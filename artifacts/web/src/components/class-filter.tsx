@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useClasses } from "@/hooks/use-classes";
 import { Users } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
@@ -16,6 +16,16 @@ interface ClassFilterProps {
 
 export function ClassFilter({ value, onChange, className }: ClassFilterProps) {
   const { data: classes, isLoading } = useClasses();
+
+  useEffect(() => {
+    if (!isLoading && classes && value) {
+      const isValid = classes.some(c => c.id === value);
+      if (!isValid) {
+        localStorage.removeItem('pedagogia_class_filter');
+        onChange(null);
+      }
+    }
+  }, [classes, isLoading, value, onChange]);
 
   if (isLoading || !classes?.length) return null;
 
