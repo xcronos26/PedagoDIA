@@ -31,10 +31,11 @@ export default function Perfil() {
       setSaved(true);
       toast({ title: "Perfil atualizado com sucesso!" });
       setTimeout(() => setSaved(false), 2500);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Tente novamente.";
       toast({
         title: "Erro ao salvar perfil",
-        description: err?.message ?? "Tente novamente.",
+        description: message,
         variant: "destructive",
       });
     } finally {

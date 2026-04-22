@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useClasses } from "@/hooks/use-classes";
 import { GraduationCap, CheckSquare, CalendarDays, BookOpen, BarChart3, Users, ArrowRight, Sparkles } from "lucide-react";
 
 const features = [
@@ -13,7 +14,10 @@ const features = [
 
 export default function BemVinda() {
   const { user } = useAuth();
+  const { data: classes } = useClasses();
   const firstName = user?.name?.split(" ")[0] ?? "Professora";
+  const ctaHref = classes && classes.length > 0 ? "/" : "/turmas";
+  const ctaLabel = classes && classes.length > 0 ? "Ir para o início" : "Vamos começar";
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
@@ -63,18 +67,20 @@ export default function BemVinda() {
         {/* CTA */}
         <div className="flex flex-col items-center gap-4">
           <Link
-            href="/turmas"
+            href={ctaHref}
             className="w-full sm:w-auto flex items-center justify-center gap-2 bg-primary text-primary-foreground px-8 py-4 rounded-2xl font-bold text-lg shadow-lg shadow-primary/25 hover:-translate-y-0.5 hover:shadow-xl transition-all"
           >
-            Vamos começar
+            {ctaLabel}
             <ArrowRight className="w-5 h-5" />
           </Link>
-          <Link
-            href="/"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Ir para o início
-          </Link>
+          {ctaHref !== "/" && (
+            <Link
+              href="/"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Ir para o início
+            </Link>
+          )}
         </div>
       </div>
     </div>
