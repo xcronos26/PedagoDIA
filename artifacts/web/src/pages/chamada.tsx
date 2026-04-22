@@ -37,6 +37,8 @@ export default function Chamada() {
   const [newStudentName, setNewStudentName] = useState("");
   const [newStudentClassId, setNewStudentClassId] = useState<string>("");
 
+  const [editingStudent, setEditingStudent] = useState<{ id: string; name: string; classId: string } | null>(null);
+
   const handleClassChange = (id: string | null) => {
     setClassFilter(id);
     if (id) localStorage.setItem('pedagogia_class_filter', id);
@@ -90,13 +92,25 @@ export default function Chamada() {
     }
   };
 
-  const handleEditStudent = (id: string, oldName: string) => {
-    const newName = prompt("Novo nome:", oldName);
-    if (newName && newName.trim() !== oldName) {
-      updateStudent({ id, name: newName.trim() }, {
-        onSuccess: () => toast({ title: "Nome atualizado." }),
-      });
-    }
+  const handleOpenEdit = (student: { id: string; name: string; classId: string | null }) => {
+    setEditingStudent({ id: student.id, name: student.name, classId: student.classId ?? '' });
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent || !editingStudent.name.trim()) return;
+    updateStudent(
+      { id: editingStudent.id, name: editingStudent.name.trim(), classId: editingStudent.classId || null },
+      {
+        onSuccess: () => {
+          setEditingStudent(null);
+          toast({ title: "Aluno atualizado com sucesso!" });
+        },
+        onError: (err) => {
+          toast({ title: "Erro ao atualizar aluno", description: err.message, variant: "destructive" });
+        },
+      }
+    );
   };
 
   return (
@@ -194,10 +208,10 @@ export default function Chamada() {
                     <span className="font-semibold text-lg text-foreground flex-1">{student.name}</span>
 
                     <div className="flex items-center gap-1 opacity-0 hover:opacity-100 transition-opacity focus-within:opacity-100 sm:mr-4">
-                      <button onClick={() => handleEditStudent(student.id, student.name)} className="p-2 text-muted-foreground hover:text-primary rounded-lg hover:bg-primary/10">
+                      <button onClick={() => handleOpenEdit(student)} title="Editar aluno" className="p-2 text-muted-foreground hover:text-primary rounded-lg hover:bg-primary/10">
                         <Edit2 className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleDeleteStudent(student.id, student.name)} className="p-2 text-muted-foreground hover:text-destructive rounded-lg hover:bg-destructive/10">
+                      <button onClick={() => handleDeleteStudent(student.id, student.name)} title="Excluir aluno" className="p-2 text-muted-foreground hover:text-destructive rounded-lg hover:bg-destructive/10">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -287,6 +301,64 @@ export default function Chamada() {
                   className="px-6 py-3 rounded-xl font-bold bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all disabled:opacity-50 flex items-center gap-2"
                 >
                   {creatingStudent && <Loader2 className="w-5 h-5 animate-spin" />}
+                  Salvar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Student Modal */}
+      {editingStudent && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-card rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-border/50">
+              <h2 className="text-2xl font-display font-bold text-foreground">Editar Aluno</h2>
+            </div>
+            <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-foreground mb-2">Nome Completo</label>
+                <input
+                  autoFocus
+                  type="text"
+                  required
+                  value={editingStudent.name}
+                  onChange={e => setEditingStudent(s => s ? { ...s, name: e.target.value } : s)}
+                  className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none text-foreground font-medium"
+                  placeholder="Ex: João da Silva"
+                />
+              </div>
+
+              {classes && classes.length > 0 && (
+                <div>
+                  <label className="block text-sm font-bold text-foreground mb-2">Turma</label>
+                  <select
+                    value={editingStudent.classId}
+                    onChange={e => setEditingStudent(s => s ? { ...s, classId: e.target.value } : s)}
+                    className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none text-foreground font-medium"
+                  >
+                    <option value="">Sem turma</option>
+                    {classes.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex gap-3 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingStudent(null)}
+                  className="px-6 py-3 rounded-xl font-bold text-muted-foreground hover:bg-muted transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!editingStudent.name.trim()}
+                  className="px-6 py-3 rounded-xl font-bold bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all disabled:opacity-50"
+                >
                   Salvar
                 </button>
               </div>

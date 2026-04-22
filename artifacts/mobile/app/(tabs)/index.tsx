@@ -31,7 +31,7 @@ function formatDateDisplay(dateStr: string) {
   return `${day}/${month}/${year}`;
 }
 
-type StudentAction = { student: Student; mode: 'options' | 'edit' } | null;
+type StudentAction = { student: Student; mode: 'options' | 'edit' | 'moveClass' } | null;
 
 function StudentCard({ student, isAbsent, onToggle, onLongPress }: {
   student: Student;
@@ -98,7 +98,7 @@ export default function AttendanceScreen() {
   const insets = useSafeAreaInsets();
   const {
     students, classes, selectedClassId, setSelectedClassId,
-    addStudent, removeStudent, editStudent, toggleAttendance, getAttendanceForDate,
+    addStudent, removeStudent, editStudent, moveStudentToClass, toggleAttendance, getAttendanceForDate,
     isLoaded, loadError, loadData,
   } = useApp();
   const { teacher, logout } = useAuth();
@@ -145,6 +145,18 @@ export default function AttendanceScreen() {
     if (!studentAction) return;
     setEditName(studentAction.student.name);
     setStudentAction({ student: studentAction.student, mode: 'edit' });
+  };
+
+  const openMoveClass = () => {
+    if (!studentAction) return;
+    setStudentAction({ student: studentAction.student, mode: 'moveClass' });
+  };
+
+  const handleMoveClass = async (classId: string | null) => {
+    if (!studentAction) return;
+    await moveStudentToClass(studentAction.student.id, classId);
+    setStudentAction(null);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   const handleSaveEdit = async () => {
@@ -318,11 +330,66 @@ export default function AttendanceScreen() {
                   <Feather name="edit-2" size={20} color={Colors.primary} />
                   <Text style={[styles.optionText, { color: Colors.primary }]}>Editar nome</Text>
                 </TouchableOpacity>
+                {classes.length > 0 && (
+                  <TouchableOpacity style={[styles.optionRow, { backgroundColor: Colors.primaryLight, borderColor: Colors.primary + '22' }]} onPress={openMoveClass} activeOpacity={0.85}>
+                    <Ionicons name="people-outline" size={20} color={Colors.primary} />
+                    <Text style={[styles.optionText, { color: Colors.primary }]}>Mudar turma</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity style={[styles.optionRow, styles.optionDelete]} onPress={handleDelete} activeOpacity={0.85}>
                   <Ionicons name="trash-outline" size={20} color={Colors.danger} />
                   <Text style={[styles.optionText, { color: Colors.danger }]}>Remover aluno</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setStudentAction(null)} activeOpacity={0.8}>
+                  <Text style={styles.modalCancelText}>Cancelar</Text>
+                </TouchableOpacity>
+              </>
+            ) : studentAction?.mode === 'moveClass' ? (
+              <>
+                <Text style={styles.modalTitle}>Mudar turma</Text>
+                <Text style={[styles.modalSubtitle, { marginBottom: 12 }]}>
+                  {studentAction.student.name}
+                </Text>
+                <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
+                  <TouchableOpacity
+                    style={[
+                      styles.classOptionRow,
+                      !studentAction.student.classId && styles.classOptionSelected,
+                    ]}
+                    onPress={() => handleMoveClass(null)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons
+                      name={!studentAction.student.classId ? 'radio-button-on' : 'radio-button-off'}
+                      size={20}
+                      color={!studentAction.student.classId ? Colors.primary : Colors.textTertiary}
+                    />
+                    <Text style={[styles.classOptionText, !studentAction.student.classId && { color: Colors.primary, fontFamily: 'Inter_600SemiBold' }]}>
+                      Sem turma
+                    </Text>
+                  </TouchableOpacity>
+                  {classes.map(c => (
+                    <TouchableOpacity
+                      key={c.id}
+                      style={[
+                        styles.classOptionRow,
+                        studentAction.student.classId === c.id && styles.classOptionSelected,
+                      ]}
+                      onPress={() => handleMoveClass(c.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={studentAction.student.classId === c.id ? 'radio-button-on' : 'radio-button-off'}
+                        size={20}
+                        color={studentAction.student.classId === c.id ? Colors.primary : Colors.textTertiary}
+                      />
+                      <Text style={[styles.classOptionText, studentAction.student.classId === c.id && { color: Colors.primary, fontFamily: 'Inter_600SemiBold' }]}>
+                        {c.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity style={[styles.modalCancelBtn, { marginTop: 8 }]} onPress={() => setStudentAction(null)} activeOpacity={0.8}>
                   <Text style={styles.modalCancelText}>Cancelar</Text>
                 </TouchableOpacity>
               </>
@@ -453,4 +520,14 @@ const styles = StyleSheet.create({
   optionEdit: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary + '60' },
   optionDelete: { backgroundColor: Colors.dangerLight, borderColor: '#FFD5D3' },
   optionText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  modalSubtitle: { fontSize: 14, fontFamily: 'Inter_400Regular', color: Colors.textSecondary },
+  classOptionRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 16,
+    borderRadius: 12, marginBottom: 6, borderWidth: 1.5, borderColor: Colors.border,
+    backgroundColor: Colors.surfaceSecondary,
+  },
+  classOptionSelected: {
+    backgroundColor: Colors.primaryLight, borderColor: Colors.primary + '60',
+  },
+  classOptionText: { flex: 1, fontSize: 15, fontFamily: 'Inter_500Medium', color: Colors.text },
 });

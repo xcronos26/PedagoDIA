@@ -62,6 +62,7 @@ interface AppContextValue {
   addStudent: (name: string, classId?: string | null) => Promise<void>;
   removeStudent: (id: string) => Promise<void>;
   editStudent: (id: string, newName: string) => Promise<void>;
+  moveStudentToClass: (id: string, classId: string | null) => Promise<void>;
   toggleAttendance: (studentId: string, date: string) => Promise<void>;
   justifyAbsence: (studentId: string, date: string, justification: string) => Promise<void>;
   setAttendanceRecord: (studentId: string, date: string, present: boolean) => Promise<void>;
@@ -253,6 +254,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         prev
           .map(s => s.id === id ? { ...s, name: student.name } : s)
           .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }))
+      );
+    });
+  }, [token, withErrorHandling]);
+
+  const moveStudentToClass = useCallback(async (id: string, classId: string | null) => {
+    if (!token) return;
+    await withErrorHandling(async () => {
+      const student = await apiFetch<ApiStudent>(`/students/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ classId }),
+        token,
+      });
+      setStudents(prev =>
+        prev.map(s => s.id === id ? { ...s, classId: student.classId ?? null } : s)
       );
     });
   }, [token, withErrorHandling]);
@@ -468,6 +483,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addStudent,
       removeStudent,
       editStudent,
+      moveStudentToClass,
       toggleAttendance,
       justifyAbsence,
       setAttendanceRecord,
