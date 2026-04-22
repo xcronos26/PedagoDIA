@@ -155,11 +155,11 @@ export default function Planejamento() {
           });
           setSuggestions(result as AiSuggestions);
         } catch {
-          // silent
+          // silent — suggestions are non-critical
         } finally {
           setLoadingSuggestions(false);
         }
-      }, 900);
+      }, 800);
     }
   };
 
@@ -308,6 +308,7 @@ export default function Planejamento() {
     const semana = (aiPlanResult as { semana: WeekDayRegente[] | WeekDayDisciplina[] }).semana;
 
     let applied = 0;
+    const failed: string[] = [];
     for (let i = 0; i < semana.length; i++) {
       const dia = semana[i];
       const date = toLocalISO(addDays(monday, i));
@@ -329,9 +330,18 @@ export default function Planejamento() {
       try {
         await upsertPlan({ date, description: desc, tema: temaDay });
         applied++;
-      } catch { /* continue */ }
+      } catch {
+        failed.push(("dia" in dia ? (dia as WeekDayRegente | WeekDayDisciplina) : dia).toString());
+      }
     }
-    toast({ title: `${applied} dias aplicados à semana!` });
+
+    if (failed.length > 0 && applied === 0) {
+      toast({ title: "Erro ao aplicar planejamento semanal", description: "Nenhum dia foi salvo. Tente novamente.", variant: "destructive" });
+    } else if (failed.length > 0) {
+      toast({ title: `${applied} de ${semana.length} dias salvos`, description: `${failed.length} dia(s) falharam. Verifique sua conexão.`, variant: "destructive" });
+    } else {
+      toast({ title: `Semana aplicada com sucesso!`, description: `${applied} dias de planejamento salvos.` });
+    }
     setAiPlanModal(false);
     setAiPlanResult(null);
   };
