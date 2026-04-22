@@ -1,0 +1,148 @@
+🧠 Como fica a estrutura FINAL (sem aquele bloco que você não gostou)
+📌 Dentro de cada dia
+1. Tema da aula
+
+(input simples)
+
+2. Descrição
+
+(texto livre — principal)
+
+3. Sugestões inteligentes (automático enquanto digita)
+
+Sem botão, sem abrir nada:
+
+Sugestão de BNCC
+Sugestão de objetivo
+
+👉 aparece como “chips” clicáveis
+
+Ex:
+
+EF04LP05 – interpretação de texto
+“Desenvolver leitura crítica”
+4. Ações
+➕ Vincular atividade
+✨ Gerar atividade com IA
+5. IA principal (no topo da semana)
+
+✨ Gerar planejamento com IA
+
+🤖 AGORA O MAIS IMPORTANTE: PROMPT DA IA
+
+Aqui está o prompt pronto pra você usar direto no backend.
+
+🎯 PROMPT — GERAR PLANEJAMENTO SEMANAL (REGENTE)
+Você é um especialista em pedagogia brasileira e planejamento escolar alinhado à BNCC.
+
+Gere um planejamento semanal para um professor do ensino fundamental.
+
+Dados de entrada:
+- Série: {{serie}}
+- Tipo de professor: regente (leciona todas as matérias)
+- Tema geral (opcional): {{tema}}
+
+Regras:
+- Estruture a semana de segunda a sexta
+- Inclua diferentes disciplinas ao longo da semana (português, matemática, ciências, história, geografia, artes, educação física)
+- Para cada dia, inclua:
+  - disciplina
+  - tema da aula
+  - objetivo da aula (curto e claro)
+  - 1 habilidade BNCC (com código e descrição)
+  - descrição simples da condução da aula
+  - sugestão de atividade prática
+
+Importante:
+- Use linguagem simples e prática para professor
+- Não seja genérico
+- Evite textos longos
+- Mantenha consistência pedagógica na semana
+
+Formato de saída (JSON):
+
+{
+  "semana": [
+    {
+      "dia": "Segunda",
+      "aulas": [
+        {
+          "disciplina": "",
+          "tema": "",
+          "objetivo": "",
+          "bncc": {
+            "codigo": "",
+            "descricao": ""
+          },
+          "descricao": "",
+          "atividade": ""
+        }
+      ]
+    }
+  ]
+}
+🎯 PROMPT — GERAR PLANEJAMENTO (PROFESSOR DE UMA MATÉRIA)
+Você é um especialista em pedagogia brasileira alinhado à BNCC.
+
+Gere um planejamento semanal para um professor que leciona apenas uma disciplina.
+
+Dados de entrada:
+- Série: {{serie}}
+- Disciplina: {{disciplina}}
+- Tema: {{tema}}
+
+Regras:
+- Estruture de segunda a sexta
+- Crie progressão pedagógica ao longo da semana
+- Para cada dia inclua:
+  - tema da aula
+  - objetivo
+  - 1 habilidade BNCC (com código e descrição)
+  - explicação simples da aula
+  - sugestão de atividade
+
+Formato JSON:
+
+{
+  "semana": [
+    {
+      "dia": "Segunda",
+      "tema": "",
+      "objetivo": "",
+      "bncc": {
+        "codigo": "",
+        "descricao": ""
+      },
+      "descricao": "",
+      "atividade": ""
+    }
+  ]
+}
+🎯 PROMPT — GERAR APENAS UM DIA
+Você é um especialista em planejamento de aulas baseado na BNCC.
+
+Crie um plano de aula para um único dia.
+
+Dados:
+- Série: {{serie}}
+- Disciplina: {{disciplina}}
+- Tema: {{tema}}
+
+Gere:
+- objetivo da aula
+- 1 habilidade BNCC (código + descrição)
+- explicação simples de como conduzir a aula
+- sugestão de atividade prática
+
+Formato JSON:
+
+{
+  "tema": "",
+  "objetivo": "",
+  "bncc": {
+    "codigo": "",
+    "descricao": ""
+  },
+  "descricao": "",
+  "atividade": ""
+}
