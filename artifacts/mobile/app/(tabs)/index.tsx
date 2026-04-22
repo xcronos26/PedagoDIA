@@ -109,6 +109,7 @@ export default function AttendanceScreen() {
   const [adding, setAdding] = useState(false);
   const [studentAction, setStudentAction] = useState<StudentAction>(null);
   const [editName, setEditName] = useState('');
+  const [editClassId, setEditClassId] = useState<string | null>(null);
 
   const filteredStudents = useMemo(() => {
     if (!selectedClassId) return students;
@@ -144,6 +145,7 @@ export default function AttendanceScreen() {
   const openEdit = () => {
     if (!studentAction) return;
     setEditName(studentAction.student.name);
+    setEditClassId(studentAction.student.classId);
     setStudentAction({ student: studentAction.student, mode: 'edit' });
   };
 
@@ -161,9 +163,12 @@ export default function AttendanceScreen() {
 
   const handleSaveEdit = async () => {
     if (!studentAction || !editName.trim()) return;
-    await editStudent(studentAction.student.id, editName);
+    const originalClassId = studentAction.student.classId;
+    const classIdChanged = editClassId !== originalClassId;
+    await editStudent(studentAction.student.id, editName, classIdChanged ? editClassId : undefined);
     setStudentAction(null);
     setEditName('');
+    setEditClassId(null);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
@@ -407,6 +412,34 @@ export default function AttendanceScreen() {
                   onSubmitEditing={handleSaveEdit}
                   autoCapitalize="words"
                 />
+                {classes.length > 0 && (
+                  <View>
+                    <Text style={styles.classLabel}>Turma</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.classChips}>
+                      <TouchableOpacity
+                        style={[styles.classChip, !editClassId && styles.classChipActive]}
+                        onPress={() => setEditClassId(null)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[styles.classChipText, !editClassId && styles.classChipTextActive]}>
+                          Sem turma
+                        </Text>
+                      </TouchableOpacity>
+                      {classes.map(c => (
+                        <TouchableOpacity
+                          key={c.id}
+                          style={[styles.classChip, editClassId === c.id && styles.classChipActive]}
+                          onPress={() => setEditClassId(c.id)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.classChipText, editClassId === c.id && styles.classChipTextActive]}>
+                            {c.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
                 <View style={styles.modalButtons}>
                   <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setStudentAction(null)} activeOpacity={0.8}>
                     <Text style={styles.modalCancelText}>Cancelar</Text>

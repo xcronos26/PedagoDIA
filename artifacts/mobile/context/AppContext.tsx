@@ -61,7 +61,7 @@ interface AppContextValue {
   loadData: () => Promise<void>;
   addStudent: (name: string, classId?: string | null) => Promise<void>;
   removeStudent: (id: string) => Promise<void>;
-  editStudent: (id: string, newName: string) => Promise<void>;
+  editStudent: (id: string, newName: string, newClassId?: string | null) => Promise<void>;
   moveStudentToClass: (id: string, classId: string | null) => Promise<void>;
   toggleAttendance: (studentId: string, date: string) => Promise<void>;
   justifyAbsence: (studentId: string, date: string, justification: string) => Promise<void>;
@@ -241,22 +241,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [token, students, withErrorHandling]);
 
-  const editStudent = useCallback(async (id: string, newName: string) => {
+  const editStudent = useCallback(async (id: string, newName: string, newClassId?: string | null) => {
     const trimmed = newName.trim();
     if (!trimmed || !token) return;
     await withErrorHandling(async () => {
+      const body: Record<string, unknown> = { name: trimmed };
+      if (newClassId !== undefined) body.classId = newClassId;
       const student = await apiFetch<ApiStudent>(`/students/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ name: trimmed }),
+        body: JSON.stringify(body),
         token,
       });
+      const oldClassId = students.find(s => s.id === id)?.classId ?? null;
       setStudents(prev =>
         prev
-          .map(s => s.id === id ? { ...s, name: student.name } : s)
+          .map(s => s.id === id ? { ...s, name: student.name, classId: student.classId ?? null } : s)
           .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }))
       );
+      if (newClassId !== undefined && oldClassId !== newClassId) {
+        setClasses(prev => prev.map(c => {
+          if (c.id === oldClassId) return { ...c, studentCount: Math.max(0, c.studentCount - 1) };
+          if (c.id === newClassId) return { ...c, studentCount: c.studentCount + 1 };
+          return c;
+        }));
+      }
     });
-  }, [token, withErrorHandling]);
+  }, [token, students, withErrorHandling]);
 
   const moveStudentToClass = useCallback(async (id: string, classId: string | null) => {
     if (!token) return;

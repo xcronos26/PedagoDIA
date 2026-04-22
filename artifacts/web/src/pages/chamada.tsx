@@ -37,7 +37,10 @@ export default function Chamada() {
   const [newStudentName, setNewStudentName] = useState("");
   const [newStudentClassId, setNewStudentClassId] = useState<string>("");
 
-  const [editingStudent, setEditingStudent] = useState<{ id: string; name: string; classId: string } | null>(null);
+  const [isEditStudentOpen, setIsEditStudentOpen] = useState(false);
+  const [editStudentId, setEditStudentId] = useState<string>("");
+  const [editStudentName, setEditStudentName] = useState("");
+  const [editStudentClassId, setEditStudentClassId] = useState<string>("");
 
   const handleClassChange = (id: string | null) => {
     setClassFilter(id);
@@ -92,18 +95,21 @@ export default function Chamada() {
     }
   };
 
-  const handleOpenEdit = (student: { id: string; name: string; classId: string | null }) => {
-    setEditingStudent({ id: student.id, name: student.name, classId: student.classId ?? '' });
+  const openEditStudent = (id: string, name: string, classId: string | null) => {
+    setEditStudentId(id);
+    setEditStudentName(name);
+    setEditStudentClassId(classId ?? "");
+    setIsEditStudentOpen(true);
   };
 
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleEditStudent = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingStudent || !editingStudent.name.trim()) return;
+    if (!editStudentName.trim()) return;
     updateStudent(
-      { id: editingStudent.id, name: editingStudent.name.trim(), classId: editingStudent.classId || null },
+      { id: editStudentId, name: editStudentName.trim(), classId: editStudentClassId || null },
       {
         onSuccess: () => {
-          setEditingStudent(null);
+          setIsEditStudentOpen(false);
           toast({ title: "Aluno atualizado com sucesso!" });
         },
         onError: (err) => {
@@ -208,7 +214,7 @@ export default function Chamada() {
                     <span className="font-semibold text-lg text-foreground flex-1">{student.name}</span>
 
                     <div className="flex items-center gap-1 opacity-0 hover:opacity-100 transition-opacity focus-within:opacity-100 sm:mr-4">
-                      <button onClick={() => handleOpenEdit(student)} title="Editar aluno" className="p-2 text-muted-foreground hover:text-primary rounded-lg hover:bg-primary/10">
+                      <button onClick={() => openEditStudent(student.id, student.name, student.classId)} className="p-2 text-muted-foreground hover:text-primary rounded-lg hover:bg-primary/10">
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button onClick={() => handleDeleteStudent(student.id, student.name)} title="Excluir aluno" className="p-2 text-muted-foreground hover:text-destructive rounded-lg hover:bg-destructive/10">
@@ -249,6 +255,63 @@ export default function Chamada() {
           </div>
         )}
       </div>
+
+      {/* Edit Student Modal */}
+      {isEditStudentOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-card rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-border/50">
+              <h2 className="text-2xl font-display font-bold text-foreground">Editar Aluno</h2>
+            </div>
+            <form onSubmit={handleEditStudent} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-foreground mb-2">Nome Completo</label>
+                <input
+                  autoFocus
+                  type="text"
+                  required
+                  value={editStudentName}
+                  onChange={e => setEditStudentName(e.target.value)}
+                  className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none text-foreground font-medium"
+                  placeholder="Ex: João da Silva"
+                />
+              </div>
+
+              {classes && classes.length > 0 && (
+                <div>
+                  <label className="block text-sm font-bold text-foreground mb-2">Turma</label>
+                  <select
+                    value={editStudentClassId}
+                    onChange={e => setEditStudentClassId(e.target.value)}
+                    className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none text-foreground font-medium"
+                  >
+                    <option value="">Sem turma</option>
+                    {classes.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex gap-3 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditStudentOpen(false)}
+                  className="px-6 py-3 rounded-xl font-bold text-muted-foreground hover:bg-muted transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-3 rounded-xl font-bold bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all flex items-center gap-2"
+                >
+                  Salvar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Add Student Modal */}
       {isAddStudentOpen && (
@@ -301,64 +364,6 @@ export default function Chamada() {
                   className="px-6 py-3 rounded-xl font-bold bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all disabled:opacity-50 flex items-center gap-2"
                 >
                   {creatingStudent && <Loader2 className="w-5 h-5 animate-spin" />}
-                  Salvar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Student Modal */}
-      {editingStudent && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-card rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-border/50">
-              <h2 className="text-2xl font-display font-bold text-foreground">Editar Aluno</h2>
-            </div>
-            <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-foreground mb-2">Nome Completo</label>
-                <input
-                  autoFocus
-                  type="text"
-                  required
-                  value={editingStudent.name}
-                  onChange={e => setEditingStudent(s => s ? { ...s, name: e.target.value } : s)}
-                  className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none text-foreground font-medium"
-                  placeholder="Ex: João da Silva"
-                />
-              </div>
-
-              {classes && classes.length > 0 && (
-                <div>
-                  <label className="block text-sm font-bold text-foreground mb-2">Turma</label>
-                  <select
-                    value={editingStudent.classId}
-                    onChange={e => setEditingStudent(s => s ? { ...s, classId: e.target.value } : s)}
-                    className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none text-foreground font-medium"
-                  >
-                    <option value="">Sem turma</option>
-                    {classes.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div className="flex gap-3 justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingStudent(null)}
-                  className="px-6 py-3 rounded-xl font-bold text-muted-foreground hover:bg-muted transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={!editingStudent.name.trim()}
-                  className="px-6 py-3 rounded-xl font-bold bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all disabled:opacity-50"
-                >
                   Salvar
                 </button>
               </div>
