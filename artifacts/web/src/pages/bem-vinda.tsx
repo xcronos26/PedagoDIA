@@ -1,5 +1,5 @@
-import React from "react";
-import { Link } from "wouter";
+import React, { useEffect } from "react";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useClasses } from "@/hooks/use-classes";
 import { GraduationCap, CheckSquare, CalendarDays, BookOpen, BarChart3, Users, ArrowRight, Sparkles } from "lucide-react";
@@ -15,9 +15,17 @@ const features = [
 export default function BemVinda() {
   const { user } = useAuth();
   const { data: classes } = useClasses();
+  const [, navigate] = useLocation();
   const firstName = user?.name?.split(" ")[0] ?? "Professora";
   const ctaHref = classes && classes.length > 0 ? "/" : "/turmas";
   const ctaLabel = classes && classes.length > 0 ? "Ir para o início" : "Vamos começar";
+
+  useEffect(() => {
+    const showWelcome = localStorage.getItem('pedagogia_show_welcome');
+    if (!showWelcome) {
+      navigate("/");
+    }
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
@@ -68,6 +76,7 @@ export default function BemVinda() {
         <div className="flex flex-col items-center gap-4">
           <Link
             href={ctaHref}
+            onClick={() => localStorage.removeItem('pedagogia_show_welcome')}
             className="w-full sm:w-auto flex items-center justify-center gap-2 bg-primary text-primary-foreground px-8 py-4 rounded-2xl font-bold text-lg shadow-lg shadow-primary/25 hover:-translate-y-0.5 hover:shadow-xl transition-all"
           >
             {ctaLabel}

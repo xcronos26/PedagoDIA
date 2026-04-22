@@ -22,6 +22,7 @@ export default function Register() {
         body: JSON.stringify({ name, email, password }),
       });
       login(res.token, res.teacher);
+      localStorage.setItem('pedagogia_show_welcome', '1');
       window.location.href = import.meta.env.BASE_URL + 'bem-vinda';
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Tente novamente.";
