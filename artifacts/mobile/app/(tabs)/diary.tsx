@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/colors';
 import { useApp, AttendanceRecord } from '@/context/AppContext';
+import { ClassPicker } from '@/components/ClassPicker';
 import {
   getWeekDays,
   getBrasiliaToday,
@@ -34,7 +35,12 @@ type EditTarget = { studentId: string; studentName: string; date: string; status
 
 export default function DiaryScreen() {
   const insets = useSafeAreaInsets();
-  const { students, attendance, setAttendanceRecord, justifyAbsence, getAttendanceForDate, isLoaded, loadError, loadData } = useApp();
+  const { students, classes, selectedClassId, setSelectedClassId, attendance, setAttendanceRecord, justifyAbsence, getAttendanceForDate, isLoaded, loadError, loadData } = useApp();
+
+  const filteredStudents = useMemo(() => {
+    if (!selectedClassId) return students;
+    return students.filter(s => s.classId === selectedClassId);
+  }, [students, selectedClassId]);
 
   const [weekOffset, setWeekOffset] = useState(0);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -179,14 +185,24 @@ export default function DiaryScreen() {
         />
       )}
 
+      <ClassPicker
+        classes={classes}
+        selectedClassId={selectedClassId}
+        onSelect={setSelectedClassId}
+      />
+
       <DataLoadingWrapper isLoaded={isLoaded} loadError={loadError} onRetry={loadData}>
-      {students.length === 0 ? (
+      {filteredStudents.length === 0 ? (
         <View style={styles.emptyState}>
           <View style={styles.emptyIcon}>
             <Ionicons name="calendar-outline" size={48} color={Colors.textTertiary} />
           </View>
-          <Text style={styles.emptyTitle}>Nenhum aluno cadastrado</Text>
-          <Text style={styles.emptySubtitle}>Adicione alunos na aba Chamada</Text>
+          <Text style={styles.emptyTitle}>
+            {selectedClassId ? 'Nenhum aluno nesta turma' : 'Nenhum aluno cadastrado'}
+          </Text>
+          <Text style={styles.emptySubtitle}>
+            {selectedClassId ? 'Adicione alunos a esta turma' : 'Adicione alunos na aba Chamada'}
+          </Text>
         </View>
       ) : (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tableWrapper}>
@@ -219,7 +235,7 @@ export default function DiaryScreen() {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: bottomPadding + 100 }}
             >
-              {students.map((student, index) => (
+              {filteredStudents.map((student, index) => (
                 <View
                   key={student.id}
                   style={[styles.studentRow, index % 2 === 0 ? styles.rowEven : styles.rowOdd]}
@@ -275,7 +291,7 @@ export default function DiaryScreen() {
       </DataLoadingWrapper>
 
       {/* Legend */}
-      {students.length > 0 && isLoaded && !loadError && (
+      {filteredStudents.length > 0 && isLoaded && !loadError && (
         <View style={styles.legend}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: Colors.successLight }]}>

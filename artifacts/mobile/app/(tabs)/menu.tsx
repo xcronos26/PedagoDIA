@@ -12,6 +12,7 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
+import { useAuth } from '@/context/AuthContext';
 
 const MENU_ITEMS = [
   {
@@ -60,6 +61,24 @@ const MENU_ITEMS = [
     bg: '#FCE7F3',
   },
   {
+    label: 'Turmas',
+    icon: 'layers',
+    lib: 'feather' as const,
+    description: 'Gerenciar turmas',
+    route: '/turmas',
+    color: '#0891B2',
+    bg: '#CFFAFE',
+  },
+  {
+    label: 'Meu Perfil',
+    icon: 'user',
+    lib: 'feather' as const,
+    description: 'Editar nome e conta',
+    route: '/perfil',
+    color: '#16A34A',
+    bg: '#DCFCE7',
+  },
+  {
     label: 'Sobre / Contribuição',
     icon: 'heart',
     lib: 'feather' as const,
@@ -72,6 +91,7 @@ const MENU_ITEMS = [
 
 export default function MenuScreen() {
   const insets = useSafeAreaInsets();
+  const { teacher } = useAuth();
   const topPadding = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPadding = Platform.OS === 'web' ? 34 : 0;
 
@@ -79,7 +99,14 @@ export default function MenuScreen() {
     <View style={[styles.container, { paddingTop: topPadding }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Menu</Text>
-        <Text style={styles.subtitle}>Acesse todas as funcionalidades</Text>
+        {teacher && (
+          <Text style={styles.subtitle} numberOfLines={1}>
+            Olá, {teacher.name.split(' ')[0]}!
+          </Text>
+        )}
+        {!teacher && (
+          <Text style={styles.subtitle}>Acesse todas as funcionalidades</Text>
+        )}
       </View>
 
       <ScrollView

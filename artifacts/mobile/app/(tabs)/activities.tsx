@@ -21,6 +21,7 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/colors';
 import { useApp, Activity } from '@/context/AppContext';
+import { ClassPicker } from '@/components/ClassPicker';
 import { getBrasiliaToday, parseISODate, toISO, formatBR } from '@/utils/date';
 
 type ActivityAction = { activity: Activity; mode: 'options' | 'edit' } | null;
@@ -103,10 +104,24 @@ const emptyForm = {
 export default function ActivitiesScreen() {
   const insets = useSafeAreaInsets();
   const {
-    activities, students, subjects, addActivity, updateActivity, removeActivity,
+    activities, students, classes, selectedClassId, setSelectedClassId,
+    subjects, addActivity, updateActivity, removeActivity,
     toggleDelivery, toggleSeen, getDeliveriesForActivity, addSubject,
     isLoaded, loadError, loadData,
   } = useApp();
+
+  const [deliveryClassId, setDeliveryClassId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (selectedActivity) {
+      setDeliveryClassId(selectedClassId);
+    }
+  }, [selectedActivity]);
+
+  const filteredDeliveryStudents = useMemo(() => {
+    if (!deliveryClassId) return students;
+    return students.filter(s => s.classId === deliveryClassId);
+  }, [students, deliveryClassId]);
 
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -227,8 +242,8 @@ export default function ActivitiesScreen() {
   const isDelivered = (studentId: string) => getDelivery(studentId)?.delivered ?? false;
   const isSeen = (studentId: string) => getDelivery(studentId)?.seen ?? false;
 
-  const deliveredCount = students.filter(s => isDelivered(s.id)).length;
-  const seenCount = students.filter(s => isSeen(s.id)).length;
+  const deliveredCount = filteredDeliveryStudents.filter(s => isDelivered(s.id)).length;
+  const seenCount = filteredDeliveryStudents.filter(s => isSeen(s.id)).length;
 
   const kavBehavior = Platform.OS === 'ios' ? 'padding' : 'height';
 
@@ -629,7 +644,7 @@ export default function ActivitiesScreen() {
                 </View>
                 <View style={styles.deliveryDivider} />
                 <View style={styles.deliveryStat}>
-                  <Text style={[styles.deliveryStatNum, { color: Colors.danger }]}>{students.length - deliveredCount}</Text>
+                  <Text style={[styles.deliveryStatNum, { color: Colors.danger }]}>{filteredDeliveryStudents.length - deliveredCount}</Text>
                   <Text style={styles.deliveryStatLabel}>Pendentes</Text>
                 </View>
               </View>
@@ -641,13 +656,23 @@ export default function ActivitiesScreen() {
                 </TouchableOpacity>
               ) : null}
 
+              {classes.length > 0 && (
+                <ClassPicker
+                  classes={classes}
+                  selectedClassId={deliveryClassId}
+                  onSelect={setDeliveryClassId}
+                />
+              )}
+
               <Text style={styles.fieldLabel}>Marcar por aluno</Text>
 
-              {students.length === 0 ? (
-                <Text style={styles.noStudentsText}>Nenhum aluno cadastrado</Text>
+              {filteredDeliveryStudents.length === 0 ? (
+                <Text style={styles.noStudentsText}>
+                  {deliveryClassId ? 'Nenhum aluno nesta turma' : 'Nenhum aluno cadastrado'}
+                </Text>
               ) : (
                 <FlatList
-                  data={students}
+                  data={filteredDeliveryStudents}
                   keyExtractor={item => item.id}
                   renderItem={({ item }) => {
                     const delivered = isDelivered(item.id);

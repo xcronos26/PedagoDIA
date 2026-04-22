@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   TextInput,
   Platform,
   KeyboardAvoidingView,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -19,6 +20,7 @@ import { Colors } from '@/constants/colors';
 import { useApp, Student } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { DataLoadingWrapper } from '@/components/DataLoadingWrapper';
+import { ClassPicker } from '@/components/ClassPicker';
 
 function formatDate(date: Date) {
   return date.toISOString().split('T')[0];
@@ -94,22 +96,32 @@ function StudentCard({ student, isAbsent, onToggle, onLongPress }: {
 
 export default function AttendanceScreen() {
   const insets = useSafeAreaInsets();
-  const { students, addStudent, removeStudent, editStudent, toggleAttendance, getAttendanceForDate, isLoaded, loadError, loadData } = useApp();
+  const {
+    students, classes, selectedClassId, setSelectedClassId,
+    addStudent, removeStudent, editStudent, toggleAttendance, getAttendanceForDate,
+    isLoaded, loadError, loadData,
+  } = useApp();
   const { teacher, logout } = useAuth();
   const [selectedDate] = useState(formatDate(new Date()));
   const [showAddModal, setShowAddModal] = useState(false);
   const [newStudentName, setNewStudentName] = useState('');
+  const [newStudentClassId, setNewStudentClassId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [studentAction, setStudentAction] = useState<StudentAction>(null);
   const [editName, setEditName] = useState('');
+
+  const filteredStudents = useMemo(() => {
+    if (!selectedClassId) return students;
+    return students.filter(s => s.classId === selectedClassId);
+  }, [students, selectedClassId]);
 
   const dateAttendance = getAttendanceForDate(selectedDate);
   const isAbsent = (studentId: string) => {
     const record = dateAttendance.find(a => a.studentId === studentId);
     return record ? !record.present : false;
   };
-  const absentCount = students.filter(s => isAbsent(s.id)).length;
-  const presentCount = students.length - absentCount;
+  const absentCount = filteredStudents.filter(s => isAbsent(s.id)).length;
+  const presentCount = filteredStudents.length - absentCount;
 
   const topPadding = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPadding = Platform.OS === 'web' ? 34 : 0;
@@ -117,8 +129,9 @@ export default function AttendanceScreen() {
   const handleAddStudent = async () => {
     if (!newStudentName.trim()) return;
     setAdding(true);
-    await addStudent(newStudentName);
+    await addStudent(newStudentName, newStudentClassId ?? selectedClassId);
     setNewStudentName('');
+    setNewStudentClassId(null);
     setAdding(false);
     setShowAddModal(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -174,8 +187,14 @@ export default function AttendanceScreen() {
         </View>
       </View>
 
+      <ClassPicker
+        classes={classes}
+        selectedClassId={selectedClassId}
+        onSelect={setSelectedClassId}
+      />
+
       <DataLoadingWrapper isLoaded={isLoaded} loadError={loadError} onRetry={loadData}>
-      {students.length > 0 && (
+      {filteredStudents.length > 0 && (
         <View style={styles.statsRow}>
           <View style={[styles.statBadge, { backgroundColor: Colors.successLight }]}>
             <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
@@ -188,13 +207,17 @@ export default function AttendanceScreen() {
         </View>
       )}
 
-      {students.length === 0 ? (
+      {filteredStudents.length === 0 ? (
         <View style={styles.emptyState}>
           <View style={styles.emptyIcon}>
             <Ionicons name="people-outline" size={48} color={Colors.textTertiary} />
           </View>
-          <Text style={styles.emptyTitle}>Nenhum aluno cadastrado</Text>
-          <Text style={styles.emptySubtitle}>Toque no + para adicionar alunos</Text>
+          <Text style={styles.emptyTitle}>
+            {selectedClassId ? 'Nenhum aluno nesta turma' : 'Nenhum aluno cadastrado'}
+          </Text>
+          <Text style={styles.emptySubtitle}>
+            {selectedClassId ? 'Adicione alunos a esta turma' : 'Toque no + para adicionar alunos'}
+          </Text>
           <TouchableOpacity style={styles.emptyButton} onPress={() => setShowAddModal(true)} activeOpacity={0.85}>
             <Ionicons name="add" size={20} color="#fff" />
             <Text style={styles.emptyButtonText}>Adicionar aluno</Text>
@@ -202,7 +225,7 @@ export default function AttendanceScreen() {
         </View>
       ) : (
         <FlatList
-          data={students}
+          data={filteredStudents}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
             <StudentCard
@@ -236,8 +259,36 @@ export default function AttendanceScreen() {
               onSubmitEditing={handleAddStudent}
               autoCapitalize="words"
             />
+            {classes.length > 0 && (
+              <View>
+                <Text style={styles.classLabel}>Turma (opcional)</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.classChips}>
+                  <TouchableOpacity
+                    style={[styles.classChip, !newStudentClassId && styles.classChipActive]}
+                    onPress={() => setNewStudentClassId(null)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.classChipText, !newStudentClassId && styles.classChipTextActive]}>
+                      Sem turma
+                    </Text>
+                  </TouchableOpacity>
+                  {classes.map(c => (
+                    <TouchableOpacity
+                      key={c.id}
+                      style={[styles.classChip, newStudentClassId === c.id && styles.classChipActive]}
+                      onPress={() => setNewStudentClassId(c.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.classChipText, newStudentClassId === c.id && styles.classChipTextActive]}>
+                        {c.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => { setShowAddModal(false); setNewStudentName(''); }} activeOpacity={0.8}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => { setShowAddModal(false); setNewStudentName(''); setNewStudentClassId(null); }} activeOpacity={0.8}>
                 <Text style={styles.modalCancelText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -332,7 +383,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
-  statsRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 8 },
+  statsRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 8, marginTop: 8 },
   statBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   statText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   list: { paddingHorizontal: 16, gap: 8, paddingTop: 4 },
@@ -375,6 +426,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, fontSize: 16, fontFamily: 'Inter_400Regular', color: Colors.text,
     borderWidth: 1.5, borderColor: Colors.border,
   },
+  classLabel: { fontSize: 13, fontFamily: 'Inter_500Medium', color: Colors.textSecondary, marginBottom: 8 },
+  classChips: { flexDirection: 'row', gap: 8 },
+  classChip: {
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+    backgroundColor: Colors.surfaceSecondary, borderWidth: 1.5, borderColor: Colors.border,
+  },
+  classChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  classChipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary },
+  classChipTextActive: { color: '#fff' },
   modalButtons: { flexDirection: 'row', gap: 12 },
   modalCancelBtn: {
     flex: 1, height: 52, alignItems: 'center', justifyContent: 'center',

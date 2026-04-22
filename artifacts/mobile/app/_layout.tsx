@@ -26,6 +26,9 @@ function RootLayoutNav() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="bem-vinda" options={{ headerShown: false, gestureEnabled: false }} />
+      <Stack.Screen name="perfil" options={{ headerShown: false }} />
+      <Stack.Screen name="turmas" options={{ headerShown: false }} />
     </Stack>
   );
 }

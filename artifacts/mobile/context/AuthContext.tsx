@@ -21,6 +21,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateProfile: (name: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -106,6 +107,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTeacher(null);
   }, []);
 
+  const updateProfile = useCallback(async (name: string) => {
+    if (!token) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const data = await apiFetch<{ teacher: Teacher }>('/auth/profile', {
+      method: 'PATCH',
+      body: JSON.stringify({ name: trimmed }),
+      token,
+    });
+    const updated = data.teacher;
+    await saveSecure(TEACHER_KEY, JSON.stringify(updated));
+    setTeacher(updated);
+  }, [token]);
+
   return (
     <AuthContext.Provider value={{
       token,
@@ -115,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       logout,
+      updateProfile,
     }}>
       {children}
     </AuthContext.Provider>

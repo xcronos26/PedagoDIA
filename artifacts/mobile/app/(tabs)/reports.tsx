@@ -24,6 +24,7 @@ import { Colors } from '@/constants/colors';
 import { useApp, Student, Activity, AttendanceRecord } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { apiFetch } from '@/utils/api';
+import { ClassPicker } from '@/components/ClassPicker';
 
 function getLast30Days() {
   const days: string[] = [];
@@ -147,7 +148,12 @@ type JustificationModal = { rec: AttendanceRecord; date: string; mode: 'view' | 
 export default function ReportsScreen() {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
-  const { students, activities, attendance, getDeliveriesForStudent, justifyAbsence, isLoaded, loadError, loadData } = useApp();
+  const { students, classes, selectedClassId, setSelectedClassId, activities, attendance, getDeliveriesForStudent, justifyAbsence, isLoaded, loadError, loadData } = useApp();
+
+  const filteredStudents = useMemo(() => {
+    if (!selectedClassId) return students;
+    return students.filter(s => s.classId === selectedClassId);
+  }, [students, selectedClassId]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<'activities' | 'reports' | 'attendance'>('activities');
@@ -814,22 +820,32 @@ export default function ReportsScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Relatórios</Text>
-          <Text style={styles.headerSub}>{students.length} alunos</Text>
+          <Text style={styles.headerSub}>{filteredStudents.length} alunos</Text>
         </View>
       </View>
 
+      <ClassPicker
+        classes={classes}
+        selectedClassId={selectedClassId}
+        onSelect={setSelectedClassId}
+      />
+
       <DataLoadingWrapper isLoaded={isLoaded} loadError={loadError} onRetry={loadData}>
-      {students.length === 0 ? (
+      {filteredStudents.length === 0 ? (
         <View style={styles.emptyState}>
           <View style={styles.emptyIcon}>
             <Ionicons name="bar-chart-outline" size={48} color={Colors.textTertiary} />
           </View>
-          <Text style={styles.emptyTitle}>Nenhum dado ainda</Text>
-          <Text style={styles.emptySubtitle}>Adicione alunos e atividades para ver relatórios</Text>
+          <Text style={styles.emptyTitle}>
+            {selectedClassId ? 'Nenhum aluno nesta turma' : 'Nenhum dado ainda'}
+          </Text>
+          <Text style={styles.emptySubtitle}>
+            {selectedClassId ? 'Adicione alunos a esta turma' : 'Adicione alunos e atividades para ver relatórios'}
+          </Text>
         </View>
       ) : (
         <FlatList
-          data={students}
+          data={filteredStudents}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
             <StudentReportCard student={item} onPress={() => setSelectedStudent(item)} />

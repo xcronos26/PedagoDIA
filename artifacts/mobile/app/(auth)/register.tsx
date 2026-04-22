@@ -16,12 +16,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/colors';
 import { useAuth } from '@/context/AuthContext';
-import { useApp } from '@/context/AppContext';
 
 export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
   const { register } = useAuth();
-  const { loadData } = useApp();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -47,8 +45,7 @@ export default function RegisterScreen() {
     setError('');
     try {
       await register(name.trim(), email.trim(), password);
-      await loadData();
-      router.replace('/(tabs)');
+      router.replace('/bem-vinda');
     } catch (e: any) {
       setError(e?.message ?? 'Erro ao criar conta');
     } finally {

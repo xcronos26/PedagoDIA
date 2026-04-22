@@ -1,11 +1,22 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiFetch, ApiError } from '@/utils/api';
 import { useAuth } from '@/context/AuthContext';
+
+const SELECTED_CLASS_KEY = 'pedagogia_selected_class';
 
 export type Student = {
   id: string;
   name: string;
+  classId: string | null;
+  createdAt: string;
+};
+
+export type Turma = {
+  id: string;
+  name: string;
+  studentCount: number;
   createdAt: string;
 };
 
@@ -42,10 +53,13 @@ interface AppContextValue {
   activities: Activity[];
   deliveries: DeliveryRecord[];
   subjects: string[];
+  classes: Turma[];
+  selectedClassId: string | null;
+  setSelectedClassId: (id: string | null) => Promise<void>;
   isLoaded: boolean;
   loadError: string | null;
   loadData: () => Promise<void>;
-  addStudent: (name: string) => Promise<void>;
+  addStudent: (name: string, classId?: string | null) => Promise<void>;
   removeStudent: (id: string) => Promise<void>;
   editStudent: (id: string, newName: string) => Promise<void>;
   toggleAttendance: (studentId: string, date: string) => Promise<void>;
@@ -60,15 +74,19 @@ interface AppContextValue {
   getDeliveriesForActivity: (activityId: string) => DeliveryRecord[];
   getDeliveriesForStudent: (studentId: string) => DeliveryRecord[];
   addSubject: (subject: string) => Promise<void>;
+  addClass: (name: string) => Promise<void>;
+  updateClass: (id: string, name: string) => Promise<void>;
+  deleteClass: (id: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-type ApiStudent = { id: string; name: string; createdAt: string };
+type ApiStudent = { id: string; name: string; classId?: string | null; createdAt: string };
 type ApiActivity = { id: string; subject: string; type: string; link?: string; date: string; description: string; createdAt: string };
 type ApiAttendance = { id: string; studentId: string; date: string; present: boolean; justified?: boolean; justification?: string };
 type ApiDelivery = { id: string; activityId: string; studentId: string; delivered: boolean; seen: boolean; deliveredAt?: string; seenAt?: string };
 type ApiSubject = { id: string; name: string };
+type ApiTurma = { id: string; name: string; studentCount: number; createdAt: string };
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const { token, logout } = useAuth();
@@ -77,8 +95,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [deliveries, setDeliveries] = useState<DeliveryRecord[]>([]);
   const [subjects, setSubjects] = useState<string[]>([]);
+  const [classes, setClasses] = useState<Turma[]>([]);
+  const [selectedClassId, setSelectedClassIdState] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(SELECTED_CLASS_KEY).then(val => {
+      if (val) setSelectedClassIdState(val);
+    });
+  }, []);
+
+  const setSelectedClassId = useCallback(async (id: string | null) => {
+    setSelectedClassIdState(id);
+    if (id) {
+      await AsyncStorage.setItem(SELECTED_CLASS_KEY, id);
+    } else {
+      await AsyncStorage.removeItem(SELECTED_CLASS_KEY);
+    }
+  }, []);
 
   const handle401 = useCallback(async (err: unknown) => {
     const apiErr = err as ApiError;
@@ -93,17 +128,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!token) return;
     setLoadError(null);
     try {
-      const [studentsData, activitiesData, attendanceData, deliveriesData, subjectsData] = await Promise.all([
+      const [studentsData, activitiesData, attendanceData, deliveriesData, subjectsData, classesData] = await Promise.all([
         apiFetch<ApiStudent[]>('/students', { token }),
         apiFetch<ApiActivity[]>('/activities', { token }),
         apiFetch<ApiAttendance[]>('/attendance', { token }),
         apiFetch<ApiDelivery[]>('/deliveries', { token }),
         apiFetch<ApiSubject[]>('/subjects', { token }),
+        apiFetch<ApiTurma[]>('/classes', { token }),
       ]);
 
-      const sortedStudents = studentsData.sort((a, b) =>
-        a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })
-      );
+      const sortedStudents = studentsData
+        .map(s => ({ ...s, classId: s.classId ?? null }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }));
       setStudents(sortedStudents);
 
       const sortedActivities = activitiesData
@@ -129,6 +165,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })));
 
       setSubjects(subjectsData.map(s => s.name).sort((a, b) => a.localeCompare(b, 'pt-BR')));
+      setClasses(classesData);
     } catch (e) {
       const was401 = await handle401(e);
       if (!was401) {
@@ -152,6 +189,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setActivities([]);
       setDeliveries([]);
       setSubjects([]);
+      setClasses([]);
       setIsLoaded(false);
       setLoadError(null);
     }
@@ -169,29 +207,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [handle401]);
 
-  const addStudent = useCallback(async (name: string) => {
+  const addStudent = useCallback(async (name: string, classId?: string | null) => {
     if (!token) return;
     await withErrorHandling(async () => {
+      const body: Record<string, unknown> = { name };
+      if (classId !== undefined) body.classId = classId;
       const student = await apiFetch<ApiStudent>('/students', {
         method: 'POST',
-        body: JSON.stringify({ name }),
+        body: JSON.stringify(body),
         token,
       });
       setStudents(prev =>
-        [...prev, student].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }))
+        [...prev, { ...student, classId: student.classId ?? null }].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }))
       );
+      if (classId) {
+        setClasses(prev => prev.map(c => c.id === classId ? { ...c, studentCount: c.studentCount + 1 } : c));
+      }
     });
   }, [token, withErrorHandling]);
 
   const removeStudent = useCallback(async (id: string) => {
     if (!token) return;
     await withErrorHandling(async () => {
+      const student = students.find(s => s.id === id);
       await apiFetch(`/students/${id}`, { method: 'DELETE', token });
       setStudents(prev => prev.filter(s => s.id !== id));
       setAttendance(prev => prev.filter(a => a.studentId !== id));
       setDeliveries(prev => prev.filter(d => d.studentId !== id));
+      if (student?.classId) {
+        setClasses(prev => prev.map(c => c.id === student.classId ? { ...c, studentCount: Math.max(0, c.studentCount - 1) } : c));
+      }
     });
-  }, [token, withErrorHandling]);
+  }, [token, students, withErrorHandling]);
 
   const editStudent = useCallback(async (id: string, newName: string) => {
     const trimmed = newName.trim();
@@ -362,6 +409,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [token, subjects, withErrorHandling]);
 
+  const addClass = useCallback(async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed || !token) return;
+    await withErrorHandling(async () => {
+      const turma = await apiFetch<ApiTurma>('/classes', {
+        method: 'POST',
+        body: JSON.stringify({ name: trimmed }),
+        token,
+      });
+      setClasses(prev => [...prev, turma].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')));
+    });
+  }, [token, withErrorHandling]);
+
+  const updateClass = useCallback(async (id: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed || !token) return;
+    await withErrorHandling(async () => {
+      const turma = await apiFetch<ApiTurma>(`/classes/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name: trimmed }),
+        token,
+      });
+      setClasses(prev =>
+        prev
+          .map(c => c.id === id ? { ...c, name: turma.name } : c)
+          .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+      );
+    });
+  }, [token, withErrorHandling]);
+
+  const deleteClass = useCallback(async (id: string) => {
+    if (!token) return;
+    await withErrorHandling(async () => {
+      await apiFetch(`/classes/${id}`, { method: 'DELETE', token });
+      setClasses(prev => prev.filter(c => c.id !== id));
+      setStudents(prev => prev.map(s => s.classId === id ? { ...s, classId: null } : s));
+      if (selectedClassId === id) {
+        setSelectedClassIdState(null);
+        await AsyncStorage.removeItem(SELECTED_CLASS_KEY);
+      }
+    });
+  }, [token, selectedClassId, withErrorHandling]);
+
   return (
     <AppContext.Provider value={{
       students,
@@ -369,6 +459,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       activities,
       deliveries,
       subjects,
+      classes,
+      selectedClassId,
+      setSelectedClassId,
       isLoaded,
       loadError,
       loadData,
@@ -387,6 +480,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       getDeliveriesForActivity,
       getDeliveriesForStudent,
       addSubject,
+      addClass,
+      updateClass,
+      deleteClass,
     }}>
       {children}
     </AppContext.Provider>
