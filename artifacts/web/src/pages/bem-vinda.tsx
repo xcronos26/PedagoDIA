@@ -48,7 +48,7 @@ export default function BemVinda() {
         {/* Greeting */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-display font-extrabold text-foreground mb-3">
-            Bem-vinda, {firstName}! 🎉
+            Bem-vindo(a), {firstName}! 🎉
           </h1>
           <p className="text-lg text-muted-foreground leading-relaxed">
             Seu <span className="font-bold text-primary">PedagoDIA</span> está pronto. Aqui você tem tudo

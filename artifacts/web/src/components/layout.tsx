@@ -11,6 +11,7 @@ function cn(...inputs: ClassValue[]) {
 
 const navItems = [
   { name: "Início", href: "/", icon: LayoutDashboard, mobileHide: true },
+  { name: "Perfil", href: "/perfil", icon: User, mobileHide: true },
   { name: "Turmas", href: "/turmas", icon: Users },
   { name: "Chamada", href: "/chamada", icon: CheckSquare },
   { name: "Diário", href: "/diario", icon: CalendarDays },
@@ -18,7 +19,6 @@ const navItems = [
   { name: "Planejamento", href: "/planejamento", icon: ClipboardList },
   { name: "Relatórios", href: "/relatorios", icon: BarChart3 },
   { name: "Sobre", href: "/sobre", icon: Heart, mobileHide: true },
-  { name: "Perfil", href: "/perfil", icon: User, mobileHide: true },
 ];
 
 const mobileNavItems = navItems.filter(item => !('mobileHide' in item && item.mobileHide));

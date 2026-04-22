@@ -53,7 +53,7 @@ export default function BemVindaScreen() {
           resizeMode="contain"
         />
 
-        <Text style={styles.greeting}>Bem-vinda,{'\n'}{firstName}! 🎉</Text>
+        <Text style={styles.greeting}>Bem-vindo(a),{'\n'}{firstName}! 🎉</Text>
         <Text style={styles.subtitle}>
           Sua conta foi criada com sucesso. O PedagoDIA vai te ajudar a:
         </Text>
