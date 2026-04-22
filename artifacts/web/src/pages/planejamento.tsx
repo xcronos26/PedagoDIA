@@ -9,6 +9,7 @@ import { useActivities, useCreateActivity, type Activity } from "@/hooks/use-act
 import { useSubjects } from "@/hooks/use-subjects";
 import { useToast } from "@/hooks/use-toast";
 import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/hooks/use-auth";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -79,6 +80,7 @@ interface GeneratedActivity {
 }
 
 export default function Planejamento() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -270,6 +272,9 @@ export default function Planejamento() {
           tipo: aiPlanTipo,
           disciplina: aiPlanDisciplina || undefined,
           tema: aiPlanTema || undefined,
+          weeklySchedule: aiPlanMode === "week" && aiPlanTipo === "regente"
+            ? (user?.weeklySchedule ?? undefined)
+            : undefined,
         }),
       });
       setAiPlanResult(result as DayPlan | WeekPlan);
@@ -733,6 +738,12 @@ export default function Planejamento() {
                       ))}
                     </div>
                   </div>
+                  {aiPlanMode === "week" && aiPlanTipo === "regente" && user?.weeklySchedule && (
+                    <div className="flex items-start gap-2 px-3 py-2.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs text-emerald-700 dark:text-emerald-400">
+                      <CalendarDays className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      <span>Sua grade semanal está configurada — a IA vai respeitar as matérias de cada dia.</span>
+                    </div>
+                  )}
                   {aiPlanTipo === "disciplina" && (
                     <div>
                       <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-1.5 block">Disciplina</label>

@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { requireAuth } from "../middlewares/auth";
+import type { WeeklySchedule } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -50,7 +51,25 @@ Responda APENAS com JSON válido, sem markdown:
 }
 `.trim();
 
-const WEEK_REGENTE_PROMPT = (serie: string, tema: string) => `
+function formatWeeklySchedule(schedule: WeeklySchedule): string {
+  const days: Array<{ label: string; key: keyof WeeklySchedule }> = [
+    { label: "Segunda-feira", key: "segunda" },
+    { label: "Terça-feira", key: "terca" },
+    { label: "Quarta-feira", key: "quarta" },
+    { label: "Quinta-feira", key: "quinta" },
+    { label: "Sexta-feira", key: "sexta" },
+  ];
+  const lines = days
+    .filter(d => schedule[d.key] && schedule[d.key].length > 0)
+    .map(d => `  - ${d.label}: ${schedule[d.key].join(", ")}`);
+  return lines.length > 0 ? lines.join("\n") : "";
+}
+
+const WEEK_REGENTE_PROMPT = (serie: string, tema: string, schedule?: WeeklySchedule | null) => {
+  const scheduleSection = schedule ? formatWeeklySchedule(schedule) : "";
+  const hasSchedule = scheduleSection.trim().length > 0;
+
+  return `
 Você é um especialista em pedagogia brasileira e planejamento escolar alinhado à BNCC.
 
 Gere um planejamento semanal para um professor regente do ensino fundamental.
@@ -59,10 +78,11 @@ Dados:
 - Série: ${serie}
 - Tipo de professor: regente (leciona todas as matérias)
 ${tema ? `- Tema geral: ${tema}` : ''}
+${hasSchedule ? `\nGrade semanal do professor (RESPEITE essa distribuição de matérias por dia):\n${scheduleSection}` : ''}
 
 Regras:
 - Estruture a semana de segunda a sexta
-- Inclua diferentes disciplinas ao longo da semana (português, matemática, ciências, história, geografia, artes, educação física)
+${hasSchedule ? '- Use as disciplinas de acordo com a grade semanal fornecida acima' : '- Inclua diferentes disciplinas ao longo da semana (português, matemática, ciências, história, geografia, artes, educação física)'}
 - Para cada dia, inclua: disciplina, tema, objetivo, habilidade BNCC (código e descrição), descrição simples da aula, sugestão de atividade prática
 - Use linguagem simples e prática
 - Não seja genérico, evite textos longos
@@ -86,6 +106,7 @@ Responda APENAS com JSON válido, sem markdown:
   ]
 }
 `.trim();
+};
 
 const WEEK_DISCIPLINA_PROMPT = (serie: string, disciplina: string, tema: string) => `
 Você é um especialista em pedagogia brasileira alinhado à BNCC.
@@ -167,7 +188,7 @@ router.post("/ai/suggest", requireAuth, async (req, res) => {
 
 router.post("/ai/generate-plan", requireAuth, async (req, res) => {
   try {
-    const { mode, serie, tipo, disciplina, tema } = req.body;
+    const { mode, serie, tipo, disciplina, tema, weeklySchedule } = req.body;
 
     if (!mode || !["day", "week"].includes(mode)) {
       res.status(400).json({ error: "mode deve ser 'day' ou 'week'" });
@@ -191,7 +212,7 @@ router.post("/ai/generate-plan", requireAuth, async (req, res) => {
       prompt = DAY_PROMPT(serie, disc, t);
     } else {
       if (tipo === "regente") {
-        prompt = WEEK_REGENTE_PROMPT(serie, tema || "");
+        prompt = WEEK_REGENTE_PROMPT(serie, tema || "", weeklySchedule ?? null);
       } else {
         const disc = disciplina || "Geral";
         prompt = WEEK_DISCIPLINA_PROMPT(serie, disc, tema || "");

@@ -1,10 +1,19 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { apiFetch } from '@/lib/api';
 
+export type WeeklySchedule = {
+  segunda: string[];
+  terca: string[];
+  quarta: string[];
+  quinta: string[];
+  sexta: string[];
+};
+
 export interface Teacher {
   id: string;
   name: string;
   email: string;
+  weeklySchedule?: WeeklySchedule | null;
 }
 
 interface AuthContextType {
@@ -12,7 +21,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (token: string, teacher: Teacher) => void;
   logout: () => void;
-  updateProfile: (name: string) => Promise<void>;
+  updateProfile: (name: string, weeklySchedule?: WeeklySchedule | null) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -52,10 +61,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.href = import.meta.env.BASE_URL + 'login';
   };
 
-  const updateProfile = async (name: string): Promise<void> => {
+  const updateProfile = async (name: string, weeklySchedule?: WeeklySchedule | null): Promise<void> => {
+    const body: Record<string, unknown> = { name };
+    if (weeklySchedule !== undefined) {
+      body.weeklySchedule = weeklySchedule;
+    }
     const res = await apiFetch<{ teacher: Teacher }>('/auth/profile', {
       method: 'PATCH',
-      body: JSON.stringify({ name }),
+      body: JSON.stringify(body),
     });
     setUser(res.teacher);
     localStorage.setItem('pedagogia_teacher', JSON.stringify(res.teacher));
