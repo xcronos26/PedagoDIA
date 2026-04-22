@@ -88,4 +88,27 @@ router.get("/auth/me", requireAuth, async (req, res) => {
   }
 });
 
+router.patch("/auth/profile", requireAuth, async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name || typeof name !== "string" || name.trim() === "") {
+      res.status(400).json({ error: "Nome é obrigatório" });
+      return;
+    }
+    const [teacher] = await db
+      .update(teachersTable)
+      .set({ name: name.trim() })
+      .where(eq(teachersTable.id, req.teacherId!))
+      .returning({ id: teachersTable.id, name: teachersTable.name, email: teachersTable.email });
+    if (!teacher) {
+      res.status(404).json({ error: "Professora não encontrada" });
+      return;
+    }
+    res.json({ teacher });
+  } catch (err) {
+    req.log.error({ err }, "Error updating teacher profile");
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
 export default router;

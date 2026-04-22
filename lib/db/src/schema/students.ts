@@ -5,6 +5,7 @@ import { z } from "zod/v4";
 export const studentsTable = pgTable("students", {
   id: text("id").primaryKey(),
   teacherId: text("teacher_id").notNull(),
+  classId: text("class_id"),
   name: text("name").notNull(),
   parentAccessToken: text("parent_access_token"),
   parentTokenExpires: timestamp("parent_token_expires"),

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, studentsTable } from "@workspace/db";
+import { db, studentsTable, classesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
 
@@ -13,16 +13,31 @@ function generateParentToken() {
   return crypto.randomUUID();
 }
 
+function formatStudent(s: typeof studentsTable.$inferSelect) {
+  return {
+    id: s.id,
+    name: s.name,
+    classId: s.classId ?? null,
+    createdAt: s.createdAt.toISOString(),
+  };
+}
+
 router.get("/students", requireAuth, async (req, res) => {
   try {
-    const students = await db.select().from(studentsTable)
-      .where(eq(studentsTable.teacherId, req.teacherId!))
+    const classId = req.query.classId as string | undefined;
+
+    const conditions = [eq(studentsTable.teacherId, req.teacherId!)];
+    if (classId) {
+      conditions.push(eq(studentsTable.classId, classId));
+    }
+
+    const students = await db
+      .select()
+      .from(studentsTable)
+      .where(and(...conditions))
       .orderBy(studentsTable.name);
-    res.json(students.map(s => ({
-      id: s.id,
-      name: s.name,
-      createdAt: s.createdAt.toISOString(),
-    })));
+
+    res.json(students.map(formatStudent));
   } catch (err) {
     req.log.error({ err }, "Error listing students");
     res.status(500).json({ error: "Erro interno do servidor" });
@@ -31,21 +46,33 @@ router.get("/students", requireAuth, async (req, res) => {
 
 router.post("/students", requireAuth, async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, classId } = req.body;
     if (!name || typeof name !== "string" || name.trim() === "") {
       res.status(400).json({ error: "Nome é obrigatório" });
       return;
     }
-    const [student] = await db.insert(studentsTable).values({
-      id: generateId(),
-      teacherId: req.teacherId!,
-      name: name.trim(),
-    }).returning();
-    res.status(201).json({
-      id: student.id,
-      name: student.name,
-      createdAt: student.createdAt.toISOString(),
-    });
+
+    if (classId) {
+      const [cls] = await db
+        .select()
+        .from(classesTable)
+        .where(and(eq(classesTable.id, classId), eq(classesTable.teacherId, req.teacherId!)));
+      if (!cls) {
+        res.status(400).json({ error: "Turma não encontrada" });
+        return;
+      }
+    }
+
+    const [student] = await db
+      .insert(studentsTable)
+      .values({
+        id: generateId(),
+        teacherId: req.teacherId!,
+        name: name.trim(),
+        classId: classId ?? null,
+      })
+      .returning();
+    res.status(201).json(formatStudent(student));
   } catch (err) {
     req.log.error({ err }, "Error creating student");
     res.status(500).json({ error: "Erro interno do servidor" });
@@ -54,22 +81,45 @@ router.post("/students", requireAuth, async (req, res) => {
 
 router.patch("/students/:id", requireAuth, async (req, res) => {
   try {
-    const { name } = req.body;
     const studentId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    
-    if (!name || typeof name !== "string" || name.trim() === "") {
-      res.status(400).json({ error: "Nome é obrigatório" });
+    const { name, classId } = req.body;
+
+    if (name !== undefined && (typeof name !== "string" || name.trim() === "")) {
+      res.status(400).json({ error: "Nome inválido" });
       return;
     }
-    const [student] = await db.update(studentsTable)
-      .set({ name: name.trim() })
+
+    if (classId !== undefined && classId !== null) {
+      const [cls] = await db
+        .select()
+        .from(classesTable)
+        .where(and(eq(classesTable.id, classId), eq(classesTable.teacherId, req.teacherId!)));
+      if (!cls) {
+        res.status(400).json({ error: "Turma não encontrada" });
+        return;
+      }
+    }
+
+    const updates: Partial<typeof studentsTable.$inferInsert> = {};
+    if (name !== undefined) updates.name = name.trim();
+    if (classId !== undefined) updates.classId = classId ?? null;
+
+    if (Object.keys(updates).length === 0) {
+      res.status(400).json({ error: "Nenhum campo para atualizar" });
+      return;
+    }
+
+    const [student] = await db
+      .update(studentsTable)
+      .set(updates)
       .where(and(eq(studentsTable.id, studentId), eq(studentsTable.teacherId, req.teacherId!)))
       .returning();
+
     if (!student) {
       res.status(404).json({ error: "Aluno não encontrado" });
       return;
     }
-    res.json({ id: student.id, name: student.name, createdAt: student.createdAt.toISOString() });
+    res.json(formatStudent(student));
   } catch (err) {
     req.log.error({ err }, "Error updating student");
     res.status(500).json({ error: "Erro interno do servidor" });
@@ -79,8 +129,9 @@ router.patch("/students/:id", requireAuth, async (req, res) => {
 router.delete("/students/:id", requireAuth, async (req, res) => {
   try {
     const studentId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    
-    await db.delete(studentsTable)
+
+    await db
+      .delete(studentsTable)
       .where(and(eq(studentsTable.id, studentId), eq(studentsTable.teacherId, req.teacherId!)));
     res.status(204).send();
   } catch (err) {
@@ -93,8 +144,9 @@ router.post("/students/:id/generate-parent-token", requireAuth, async (req, res)
   try {
     const studentId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
-    // Buscar o aluno primeiro
-    const [existing] = await db.select().from(studentsTable)
+    const [existing] = await db
+      .select()
+      .from(studentsTable)
       .where(and(eq(studentsTable.id, studentId), eq(studentsTable.teacherId, req.teacherId!)));
 
     if (!existing) {
@@ -102,9 +154,11 @@ router.post("/students/:id/generate-parent-token", requireAuth, async (req, res)
       return;
     }
 
-    // Reutilizar token se ainda for válido (não expirou)
     const now = new Date();
-    const hasValidToken = existing.parentAccessToken && existing.parentTokenExpires && existing.parentTokenExpires > now;
+    const hasValidToken =
+      existing.parentAccessToken &&
+      existing.parentTokenExpires &&
+      existing.parentTokenExpires > now;
 
     let finalToken: string;
     let finalExpires: Date;
@@ -113,12 +167,12 @@ router.post("/students/:id/generate-parent-token", requireAuth, async (req, res)
       finalToken = existing.parentAccessToken!;
       finalExpires = existing.parentTokenExpires!;
     } else {
-      // Gerar novo token
       finalToken = generateParentToken();
       finalExpires = new Date();
-      finalExpires.setMonth(finalExpires.getMonth() + 6); // 6 meses de validade
+      finalExpires.setMonth(finalExpires.getMonth() + 6);
 
-      await db.update(studentsTable)
+      await db
+        .update(studentsTable)
         .set({ parentAccessToken: finalToken, parentTokenExpires: finalExpires })
         .where(eq(studentsTable.id, studentId));
     }
@@ -129,7 +183,7 @@ router.post("/students/:id/generate-parent-token", requireAuth, async (req, res)
     res.json({
       token: finalToken,
       expiresAt: finalExpires.toISOString(),
-      url: `${proto}://${host}/web/relatorio/${finalToken}`
+      url: `${proto}://${host}/web/relatorio/${finalToken}`,
     });
   } catch (err: any) {
     req.log.error({ err }, "Error generating parent token");
