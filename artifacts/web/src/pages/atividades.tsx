@@ -5,6 +5,7 @@ import { useActivities, useCreateActivity, useUpdateActivity, useDeleteActivity,
 import { useStudents } from "@/hooks/use-students";
 import { useDeliveries, useToggleDelivery } from "@/hooks/use-deliveries";
 import { useSubjects } from "@/hooks/use-subjects";
+import { ClassFilter } from "@/components/class-filter";
 import { Plus, Book, FileText, Calendar as CalendarIcon, Link as LinkIcon, Trash2, Edit2, ChevronDown, CheckCircle2, Circle, Loader2 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -16,7 +17,8 @@ function cn(...inputs: ClassValue[]) {
 
 function ActivityCard({ activity, onEdit }: { activity: Activity; onEdit: (a: Activity) => void }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const { data: students } = useStudents();
+  const [deliveryClass, setDeliveryClass] = useState<string | null>(null);
+  const { data: students } = useStudents(deliveryClass);
   const { data: deliveries } = useDeliveries(activity.id);
   const { mutate: toggleDelivery } = useToggleDelivery();
   const { mutate: deleteActivity } = useDeleteActivity();
@@ -171,10 +173,13 @@ function ActivityCard({ activity, onEdit }: { activity: Activity; onEdit: (a: Ac
           
           {/* Student List */}
           <div className="p-4">
-            <h4 className="font-bold text-foreground mb-3 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-success" />
-              Entregas ({deliveredCount}/{totalCount})
-            </h4>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+              <h4 className="font-bold text-foreground flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-success" />
+                Entregas ({deliveredCount}/{totalCount})
+              </h4>
+              <ClassFilter value={deliveryClass} onChange={setDeliveryClass} />
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {students?.map(student => {
                 const delivery = deliveries?.find(d => d.studentId === student.id);

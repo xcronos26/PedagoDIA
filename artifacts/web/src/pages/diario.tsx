@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from "react";
-import { format, addDays, startOfWeek, subWeeks, addWeeks, isSameDay, parseISO } from "date-fns";
+import { format, addDays, startOfWeek, subWeeks, addWeeks, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useStudents } from "@/hooks/use-students";
 import { useAllAttendance, useToggleAttendance } from "@/hooks/use-attendance";
+import { ClassFilter } from "@/components/class-filter";
 import { ChevronLeft, ChevronRight, Check, X, Calendar as CalendarIcon, Loader2 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -11,16 +12,19 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+function getStoredClass() {
+  return localStorage.getItem('pedagogia_class_filter') || null;
+}
+
 export default function Diario() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const { data: students, isLoading: loadingStudents } = useStudents();
+  const [classFilter, setClassFilter] = useState<string | null>(getStoredClass);
+  const { data: students, isLoading: loadingStudents } = useStudents(classFilter);
   const { data: attendance, isLoading: loadingAttendance } = useAllAttendance();
   const { mutate: toggleAttendance } = useToggleAttendance();
 
-  // Get Monday of the current selected week
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-  
-  // Generate Mon-Fri dates
+
   const weekDays = useMemo(() => {
     return Array.from({ length: 5 }).map((_, i) => addDays(weekStart, i));
   }, [weekStart]);
@@ -28,6 +32,12 @@ export default function Diario() {
   const handlePrevWeek = () => setCurrentDate(prev => subWeeks(prev, 1));
   const handleNextWeek = () => setCurrentDate(prev => addWeeks(prev, 1));
   const handleToday = () => setCurrentDate(new Date());
+
+  const handleClassChange = (id: string | null) => {
+    setClassFilter(id);
+    if (id) localStorage.setItem('pedagogia_class_filter', id);
+    else localStorage.removeItem('pedagogia_class_filter');
+  };
 
   const getAttendanceStatus = (studentId: string, dateStr: string) => {
     if (!attendance) return undefined;
@@ -37,7 +47,6 @@ export default function Diario() {
 
   const handleCellClick = (studentId: string, date: Date, currentStatus?: boolean) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    // Cycle: undefined -> true -> false -> true
     const nextStatus = currentStatus === undefined ? true : !currentStatus;
     toggleAttendance({ studentId, date: dateStr, present: nextStatus });
   };
@@ -68,6 +77,9 @@ export default function Diario() {
         </div>
       </div>
 
+      {/* Class Filter */}
+      <ClassFilter value={classFilter} onChange={handleClassChange} />
+
       {/* Main Grid */}
       <div className="bg-card border border-border/50 rounded-2xl shadow-sm overflow-hidden overflow-x-auto">
         {(loadingStudents || loadingAttendance) ? (
@@ -77,7 +89,11 @@ export default function Diario() {
           </div>
         ) : !students?.length ? (
           <div className="p-12 text-center text-muted-foreground">
-            <p>Nenhum aluno cadastrado. Vá até a aba Chamada para adicionar alunos.</p>
+            <p>
+              {classFilter
+                ? "Nenhum aluno nesta turma. Vá até a Chamada para adicionar alunos."
+                : "Nenhum aluno cadastrado. Vá até a aba Chamada para adicionar alunos."}
+            </p>
           </div>
         ) : (
           <table className="w-full text-left border-collapse min-w-[800px]">
@@ -112,7 +128,7 @@ export default function Diario() {
                 <tr key={student.id} className="hover:bg-muted/10 transition-colors group">
                   <td className="p-4 font-semibold text-foreground border-r border-border/50 sticky left-0 z-10 bg-card group-hover:bg-muted/10 transition-colors">
                     <div className="flex items-center gap-3">
-                      <span className="text-xs text-muted-foreground w-4 text-right">{i+1}.</span>
+                      <span className="text-xs text-muted-foreground w-4 text-right">{i + 1}.</span>
                       <span className="truncate">{student.name}</span>
                     </div>
                   </td>
@@ -120,7 +136,7 @@ export default function Diario() {
                     const dateStr = format(day, 'yyyy-MM-dd');
                     const status = getAttendanceStatus(student.id, dateStr);
                     const isToday = isSameDay(day, new Date());
-                    
+
                     return (
                       <td key={dateStr} className={cn(
                         "p-2 text-center transition-colors border-r border-border/10 last:border-r-0",

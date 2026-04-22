@@ -22,7 +22,7 @@ export default function Register() {
         body: JSON.stringify({ name, email, password }),
       });
       login(res.token, res.teacher);
-      window.location.href = import.meta.env.BASE_URL;
+      window.location.href = import.meta.env.BASE_URL + 'bem-vinda';
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Tente novamente.";
       toast({

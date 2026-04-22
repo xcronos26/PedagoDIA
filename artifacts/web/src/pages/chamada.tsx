@@ -2,8 +2,10 @@ import React, { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useStudents, useCreateStudent, useUpdateStudent, useDeleteStudent } from "@/hooks/use-students";
+import { useClasses } from "@/hooks/use-classes";
 import { useAttendanceByDate, useToggleAttendance } from "@/hooks/use-attendance";
-import { Plus, Check, X, Calendar as CalendarIcon, UserPlus, Search, Edit2, Trash2, Loader2, AlertCircle } from "lucide-react";
+import { ClassFilter } from "@/components/class-filter";
+import { Plus, Check, X, Calendar as CalendarIcon, UserPlus, Search, Edit2, Trash2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -12,12 +14,19 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+function getStoredClass() {
+  return localStorage.getItem('pedagogia_class_filter') || null;
+}
+
 export default function Chamada() {
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [search, setSearch] = useState("");
-  const { data: students, isLoading: loadingStudents } = useStudents();
+  const [classFilter, setClassFilter] = useState<string | null>(getStoredClass);
+
+  const { data: classes } = useClasses();
+  const { data: students, isLoading: loadingStudents } = useStudents(classFilter);
   const { data: attendance, isLoading: loadingAttendance } = useAttendanceByDate(date);
-  
+
   const { mutate: toggleAttendance } = useToggleAttendance();
   const { mutate: createStudent, isPending: creatingStudent } = useCreateStudent();
   const { mutate: updateStudent } = useUpdateStudent();
@@ -26,6 +35,13 @@ export default function Chamada() {
 
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
   const [newStudentName, setNewStudentName] = useState("");
+  const [newStudentClassId, setNewStudentClassId] = useState<string>("");
+
+  const handleClassChange = (id: string | null) => {
+    setClassFilter(id);
+    if (id) localStorage.setItem('pedagogia_class_filter', id);
+    else localStorage.removeItem('pedagogia_class_filter');
+  };
 
   const filteredStudents = useMemo(() => {
     if (!students) return [];
@@ -34,9 +50,11 @@ export default function Chamada() {
 
   const stats = useMemo(() => {
     if (!students || !attendance) return { present: 0, absent: 0, total: 0 };
+    const studentIds = new Set(students.map(s => s.id));
     let present = 0;
     let absent = 0;
     attendance.forEach(a => {
+      if (!studentIds.has(a.studentId)) return;
       if (a.present) present++;
       else absent++;
     });
@@ -50,23 +68,25 @@ export default function Chamada() {
   const handleAddStudent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStudentName.trim()) return;
-    createStudent({ name: newStudentName.trim() }, {
-      onSuccess: () => {
-        setNewStudentName("");
-        setIsAddStudentOpen(false);
-        toast({ title: "Aluno adicionado com sucesso!" });
-      },
-      onError: (err) => {
-        toast({ title: "Erro ao adicionar aluno", description: err.message, variant: "destructive" });
+    createStudent(
+      { name: newStudentName.trim(), classId: newStudentClassId || null },
+      {
+        onSuccess: () => {
+          setNewStudentName("");
+          setNewStudentClassId("");
+          setIsAddStudentOpen(false);
+          toast({ title: "Aluno adicionado com sucesso!" });
+        },
+        onError: (err) => {
+          toast({ title: "Erro ao adicionar aluno", description: err.message, variant: "destructive" });
+        },
       }
-    });
+    );
   };
 
   const handleDeleteStudent = (id: string, name: string) => {
     if (confirm(`Tem certeza que deseja excluir o aluno(a) ${name}? O histórico também será apagado.`)) {
-      deleteStudent(id, {
-        onSuccess: () => toast({ title: "Aluno excluído." })
-      });
+      deleteStudent(id, { onSuccess: () => toast({ title: "Aluno excluído." }) });
     }
   };
 
@@ -74,7 +94,7 @@ export default function Chamada() {
     const newName = prompt("Novo nome:", oldName);
     if (newName && newName.trim() !== oldName) {
       updateStudent({ id, name: newName.trim() }, {
-        onSuccess: () => toast({ title: "Nome atualizado." })
+        onSuccess: () => toast({ title: "Nome atualizado." }),
       });
     }
   };
@@ -100,7 +120,7 @@ export default function Chamada() {
               className="pl-10 pr-4 py-3 bg-card border-2 border-border rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none w-full font-bold text-foreground shadow-sm"
             />
           </div>
-          <button 
+          <button
             onClick={() => setIsAddStudentOpen(true)}
             className="bg-primary text-primary-foreground p-3 rounded-xl shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all"
             title="Adicionar Aluno"
@@ -109,6 +129,9 @@ export default function Chamada() {
           </button>
         </div>
       </div>
+
+      {/* Class Filter */}
+      <ClassFilter value={classFilter} onChange={handleClassChange} />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-3 gap-4">
@@ -150,7 +173,9 @@ export default function Chamada() {
             <img src={`${import.meta.env.BASE_URL}images/empty-state.png`} alt="Nenhum aluno" className="w-48 h-48 mb-6 opacity-80" />
             <h3 className="text-xl font-bold text-foreground mb-2">Nenhum aluno encontrado</h3>
             <p className="text-muted-foreground max-w-sm">
-              Adicione alunos clicando no botão de "+" no topo da tela para começar a registrar a chamada.
+              {classFilter
+                ? "Nenhum aluno nesta turma ainda. Adicione alunos ou selecione outra turma."
+                : 'Adicione alunos clicando no botão "+" no topo da tela.'}
             </p>
           </div>
         ) : (
@@ -167,7 +192,7 @@ export default function Chamada() {
                       {index + 1}
                     </div>
                     <span className="font-semibold text-lg text-foreground flex-1">{student.name}</span>
-                    
+
                     <div className="flex items-center gap-1 opacity-0 hover:opacity-100 transition-opacity focus-within:opacity-100 sm:mr-4">
                       <button onClick={() => handleEditStudent(student.id, student.name)} className="p-2 text-muted-foreground hover:text-primary rounded-lg hover:bg-primary/10">
                         <Edit2 className="w-4 h-4" />
@@ -183,8 +208,8 @@ export default function Chamada() {
                       onClick={() => handleToggle(student.id, true)}
                       className={cn(
                         "flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold transition-all duration-200",
-                        isPresent 
-                          ? "bg-success text-success-foreground shadow-md shadow-success/20 scale-105" 
+                        isPresent
+                          ? "bg-success text-success-foreground shadow-md shadow-success/20 scale-105"
                           : "bg-transparent text-muted-foreground hover:bg-success/10 hover:text-success"
                       )}
                     >
@@ -195,8 +220,8 @@ export default function Chamada() {
                       onClick={() => handleToggle(student.id, false)}
                       className={cn(
                         "flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold transition-all duration-200",
-                        isAbsent 
-                          ? "bg-destructive text-destructive-foreground shadow-md shadow-destructive/20 scale-105" 
+                        isAbsent
+                          ? "bg-destructive text-destructive-foreground shadow-md shadow-destructive/20 scale-105"
                           : "bg-transparent text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                       )}
                     >
@@ -218,18 +243,37 @@ export default function Chamada() {
             <div className="p-6 border-b border-border/50">
               <h2 className="text-2xl font-display font-bold text-foreground">Novo Aluno</h2>
             </div>
-            <form onSubmit={handleAddStudent} className="p-6">
-              <label className="block text-sm font-bold text-foreground mb-2">Nome Completo</label>
-              <input
-                autoFocus
-                type="text"
-                required
-                value={newStudentName}
-                onChange={e => setNewStudentName(e.target.value)}
-                className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none text-foreground font-medium"
-                placeholder="Ex: João da Silva"
-              />
-              <div className="mt-8 flex gap-3 justify-end">
+            <form onSubmit={handleAddStudent} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-foreground mb-2">Nome Completo</label>
+                <input
+                  autoFocus
+                  type="text"
+                  required
+                  value={newStudentName}
+                  onChange={e => setNewStudentName(e.target.value)}
+                  className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none text-foreground font-medium"
+                  placeholder="Ex: João da Silva"
+                />
+              </div>
+
+              {classes && classes.length > 0 && (
+                <div>
+                  <label className="block text-sm font-bold text-foreground mb-2">Turma</label>
+                  <select
+                    value={newStudentClassId}
+                    onChange={e => setNewStudentClassId(e.target.value)}
+                    className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none text-foreground font-medium"
+                  >
+                    <option value="">Sem turma</option>
+                    {classes.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex gap-3 justify-end pt-2">
                 <button
                   type="button"
                   onClick={() => setIsAddStudentOpen(false)}

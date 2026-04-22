@@ -12,6 +12,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (token: string, teacher: Teacher) => void;
   logout: () => void;
+  updateProfile: (name: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -51,8 +52,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.href = import.meta.env.BASE_URL + 'login';
   };
 
+  const updateProfile = async (name: string): Promise<void> => {
+    const res = await apiFetch<{ teacher: Teacher }>('/auth/profile', {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    });
+    setUser(res.teacher);
+    localStorage.setItem('pedagogia_teacher', JSON.stringify(res.teacher));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

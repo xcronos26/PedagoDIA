@@ -9,6 +9,7 @@ import { useJustifyAbsence } from "@/hooks/use-attendance";
 import { useGenerateParentToken } from "@/hooks/use-parent-token";
 import { useStudentReports, useCreateStudentReport, useUpdateStudentReport, useDeleteStudentReport, type StudentReport } from "@/hooks/use-student-reports";
 import { BarChart3, TrendingUp, CheckCircle2, XCircle, Search, User as UserIcon, BookOpen, Calendar, AlertCircle, Edit3, Eye, FileText, Link as LinkIcon, ExternalLink, Share2, Copy, Printer, Pencil, Trash2 } from "lucide-react";
+import { ClassFilter } from "@/components/class-filter";
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -18,12 +19,24 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+function getStoredClass() {
+  return localStorage.getItem('pedagogia_class_filter') || null;
+}
+
 export default function Relatorios() {
-  const { data: students, isLoading: l1 } = useStudents();
+  const [classFilter, setClassFilter] = useState<string | null>(getStoredClass);
+  const { data: students, isLoading: l1 } = useStudents(classFilter);
   const { data: attendance, isLoading: l2 } = useAllAttendance();
   const { data: activities, isLoading: l3 } = useActivities();
   const { data: deliveries, isLoading: l4 } = useAllDeliveries();
   const justifyAbsence = useJustifyAbsence();
+
+  const handleClassChange = (id: string | null) => {
+    setClassFilter(id);
+    setSelectedStudentId("");
+    if (id) localStorage.setItem('pedagogia_class_filter', id);
+    else localStorage.removeItem('pedagogia_class_filter');
+  };
   
   const [selectedStudentId, setSelectedStudentId] = useState<string>("");
   const [search, setSearch] = useState("");
@@ -192,8 +205,9 @@ export default function Relatorios() {
       
       {/* Student Sidebar List */}
       <div className="w-full md:w-80 flex-shrink-0 border-r border-border bg-card flex flex-col h-[40vh] md:h-full z-10 shadow-xl md:shadow-none">
-        <div className="p-4 border-b border-border/50 bg-card">
-          <h2 className="text-xl font-display font-bold text-foreground mb-4">Relatórios</h2>
+        <div className="p-4 border-b border-border/50 bg-card space-y-3">
+          <h2 className="text-xl font-display font-bold text-foreground">Relatórios</h2>
+          <ClassFilter value={classFilter} onChange={handleClassChange} />
           <div className="relative">
             <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input

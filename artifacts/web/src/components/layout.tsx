@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { CalendarDays, CheckSquare, BookOpen, BarChart3, LogOut, GraduationCap, LayoutDashboard, ClipboardList, Heart } from "lucide-react";
+import { CalendarDays, CheckSquare, BookOpen, BarChart3, LogOut, GraduationCap, LayoutDashboard, ClipboardList, Heart, Users, User } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -9,10 +9,24 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+const navItems = [
+  { name: "Início", href: "/", icon: LayoutDashboard, mobileHide: true },
+  { name: "Turmas", href: "/turmas", icon: Users },
+  { name: "Chamada", href: "/chamada", icon: CheckSquare },
+  { name: "Diário", href: "/diario", icon: CalendarDays },
+  { name: "Atividades", href: "/atividades", icon: BookOpen },
+  { name: "Planejamento", href: "/planejamento", icon: ClipboardList },
+  { name: "Relatórios", href: "/relatorios", icon: BarChart3 },
+  { name: "Sobre", href: "/sobre", icon: Heart, mobileHide: true },
+  { name: "Perfil", href: "/perfil", icon: User, mobileHide: true },
+];
+
+const mobileNavItems = navItems.filter(item => !('mobileHide' in item && item.mobileHide));
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, logout, isLoading } = useAuth();
-  
+
   if (isLoading) {
     return <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
@@ -20,18 +34,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    return <>{children}</>; // Unauthenticated pages (Login/Register) handle themselves
+    return <>{children}</>;
   }
-
-  const navItems = [
-    { name: "Início", href: "/", icon: LayoutDashboard },
-    { name: "Chamada", href: "/chamada", icon: CheckSquare },
-    { name: "Diário", href: "/diario", icon: CalendarDays },
-    { name: "Atividades", href: "/atividades", icon: BookOpen },
-    { name: "Planejamento", href: "/planejamento", icon: ClipboardList },
-    { name: "Relatórios", href: "/relatorios", icon: BarChart3 },
-    { name: "Sobre", href: "/sobre", icon: Heart },
-  ];
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row text-foreground">
@@ -45,18 +49,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
             PedagoDIA
           </div>
         </div>
-        
-        <nav className="flex-1 px-4 space-y-2 mt-4">
+
+        <nav className="flex-1 px-4 space-y-1 mt-2 overflow-y-auto">
           {navItems.map((item) => {
             const isActive = location === item.href;
             return (
-              <Link 
-                key={item.name} 
+              <Link
+                key={item.name}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-3.5 rounded-2xl font-semibold transition-all duration-200 group",
-                  isActive 
-                    ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 translate-x-1" 
+                  "flex items-center gap-3 px-4 py-3 rounded-2xl font-semibold transition-all duration-200 group",
+                  isActive
+                    ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 translate-x-1"
                     : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 )}
               >
@@ -68,22 +72,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="p-4 border-t border-sidebar-border mt-auto bg-muted/20">
-          <div className="flex items-center gap-3 px-2 py-3">
-            <div className="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold font-display text-lg">
+          <Link href="/perfil" className="flex items-center gap-3 px-2 py-3 rounded-2xl hover:bg-sidebar-accent transition-colors group">
+            <div className="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold font-display text-lg shrink-0">
               {user.name.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-sm truncate">{user.name}</p>
+              <p className="font-bold text-sm truncate group-hover:text-primary transition-colors">{user.name}</p>
               <p className="text-xs text-muted-foreground truncate">{user.email}</p>
             </div>
-            <button 
-              onClick={logout}
+            <button
+              onClick={(e) => { e.preventDefault(); logout(); }}
               className="p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-xl transition-colors"
               title="Sair"
             >
               <LogOut className="w-5 h-5" />
             </button>
-          </div>
+          </Link>
         </div>
       </aside>
 
@@ -96,16 +100,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
             PedagoDIA
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-sm">
+            <Link href="/perfil" className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-sm">
               {user.name.charAt(0).toUpperCase()}
-            </div>
+            </Link>
             <span className="text-sm font-semibold text-foreground hidden xs:block truncate max-w-[100px]">{user.name.split(" ")[0]}</span>
             <button onClick={logout} className="text-muted-foreground p-2 rounded-lg hover:bg-muted">
               <LogOut className="w-5 h-5" />
             </button>
           </div>
         </header>
-        
+
         <div className="flex-1">
           {children}
         </div>
@@ -113,14 +117,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Bottom Nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-sidebar border-t border-border flex justify-around p-2 pb-safe shadow-[0_-5px_15px_rgba(0,0,0,0.05)] z-30">
-        {navItems.map((item) => {
+        {mobileNavItems.map((item) => {
           const isActive = location === item.href;
           return (
-            <Link 
-              key={item.name} 
+            <Link
+              key={item.name}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-1 p-2 rounded-xl min-w-[70px] transition-all duration-200",
+                "flex flex-col items-center gap-1 p-2 rounded-xl min-w-0 flex-1 transition-all duration-200",
                 isActive ? "text-primary" : "text-muted-foreground hover:bg-sidebar-accent"
               )}
             >
@@ -128,9 +132,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 "p-1.5 rounded-full transition-all duration-200",
                 isActive ? "bg-primary/10" : ""
               )}>
-                <item.icon className={cn("w-6 h-6", isActive ? "fill-primary/20" : "")} />
+                <item.icon className={cn("w-5 h-5", isActive ? "fill-primary/20" : "")} />
               </div>
-              <span className="text-[10px] font-semibold">{item.name}</span>
+              <span className="text-[9px] font-semibold truncate w-full text-center">{item.name}</span>
             </Link>
           );
         })}
