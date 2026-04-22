@@ -37,7 +37,8 @@ function ActivityCard({ activity, onEdit }: { activity: Activity; onEdit: (a: Ac
     }
   };
 
-  const deliveredCount = deliveries?.filter(d => d.delivered).length || 0;
+  const visibleStudentIds = new Set(students?.map(s => s.id) ?? []);
+  const deliveredCount = deliveries?.filter(d => d.delivered && visibleStudentIds.has(d.studentId)).length || 0;
   const totalCount = students?.length || 0;
   const progress = totalCount === 0 ? 0 : (deliveredCount / totalCount) * 100;
 

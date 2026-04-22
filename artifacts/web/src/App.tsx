@@ -57,12 +57,14 @@ function Router() {
       <Route path="/login"><AuthRoute component={Login} /></Route>
       <Route path="/register"><AuthRoute component={Register} /></Route>
 
+      {/* Onboarding - protected but without app layout */}
+      <Route path="/bem-vinda"><ProtectedRoute component={BemVinda} /></Route>
+
       {/* Protected routes with layout */}
       <Route>
         <Layout>
           <Switch>
             <Route path="/"><ProtectedRoute component={Dashboard} /></Route>
-            <Route path="/bem-vinda"><ProtectedRoute component={BemVinda} /></Route>
             <Route path="/perfil"><ProtectedRoute component={Perfil} /></Route>
             <Route path="/turmas"><ProtectedRoute component={Turmas} /></Route>
             <Route path="/chamada"><ProtectedRoute component={Chamada} /></Route>
