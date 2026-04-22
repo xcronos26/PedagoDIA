@@ -13,6 +13,7 @@ function mapPlan(plan: typeof lessonPlansTable.$inferSelect, activityIds: string
   return {
     id: plan.id,
     date: plan.date,
+    tema: plan.tema ?? "",
     description: plan.description,
     activityIds,
     createdAt: plan.createdAt.toISOString(),
@@ -62,7 +63,7 @@ router.get("/lesson-plans", requireAuth, async (req, res) => {
 
 router.post("/lesson-plans", requireAuth, async (req, res) => {
   try {
-    const { date, description } = req.body;
+    const { date, description, tema } = req.body;
     if (!date || typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       res.status(400).json({ error: "date é obrigatório no formato YYYY-MM-DD" });
       return;
@@ -74,11 +75,12 @@ router.post("/lesson-plans", requireAuth, async (req, res) => {
         id: generateId(),
         teacherId: req.teacherId!,
         date,
+        tema: tema ?? null,
         description: desc,
       })
       .onConflictDoUpdate({
         target: [lessonPlansTable.teacherId, lessonPlansTable.date],
-        set: { description: desc },
+        set: { description: desc, tema: tema ?? null },
       })
       .returning();
 

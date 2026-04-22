@@ -4,6 +4,7 @@ export const lessonPlansTable = pgTable("lesson_plans", {
   id: text("id").primaryKey(),
   teacherId: text("teacher_id").notNull(),
   date: text("date").notNull(),
+  tema: text("tema"),
   description: text("description").notNull().default(""),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => ({

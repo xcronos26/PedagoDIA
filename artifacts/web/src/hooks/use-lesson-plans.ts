@@ -4,6 +4,7 @@ import { apiFetch } from "@/lib/api";
 export interface LessonPlan {
   id: string;
   date: string;
+  tema: string;
   description: string;
   activityIds: string[];
   createdAt: string;
@@ -20,7 +21,7 @@ export function useLessonPlans(month: string) {
 export function useUpsertLessonPlan() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { date: string; description: string }) =>
+    mutationFn: (data: { date: string; description: string; tema?: string }) =>
       apiFetch('/lesson-plans', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: (_, vars) => {
       const month = vars.date.substring(0, 7);

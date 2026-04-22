@@ -10,6 +10,7 @@ import deliveriesRouter from "./deliveries";
 import parentReportsRouter from "./parent-reports";
 import studentReportsRouter from "./student-reports";
 import lessonPlansRouter from "./lesson-plans";
+import aiRouter from "./ai";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(deliveriesRouter);
 router.use(parentReportsRouter);
 router.use(studentReportsRouter);
 router.use(lessonPlansRouter);
+router.use(aiRouter);
 
 export default router;

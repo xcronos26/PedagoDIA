@@ -82,6 +82,8 @@ Express 5 API with JWT auth. All data routes require Bearer token.
 - **Protected routes**: `/api/students`, `/api/activities`, `/api/attendance`, `/api/subjects`, `/api/deliveries`
 - **Auth**: `bcryptjs` (password hashing), `jsonwebtoken` (JWT, 30d expiry), `requireAuth` middleware
 - **JWT_SECRET**: Set in shared environment variables
+- **AI routes** (Gemini): `POST /ai/suggest` (BNCC+objectives chips), `POST /ai/generate-plan` (day/week plans), `POST /ai/generate-activity`
+- **GEMINI_API_KEY**: Set in Replit Secrets. Uses `@google/generative-ai` SDK with `gemini-2.5-flash`
 
 ## Packages
 
