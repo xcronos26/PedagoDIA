@@ -36,7 +36,7 @@ function getLast30Days() {
   return days;
 }
 
-function StudentReportCard({ student, onPress }: { student: Student; onPress: () => void }) {
+function StudentReportCard({ student, onPress, className }: { student: Student; onPress: () => void; className?: string | null }) {
   const { activities, getDeliveriesForStudent } = useApp();
   const deliveries = getDeliveriesForStudent(student.id);
   const deliveredCount = deliveries.filter(d => d.delivered).length;
@@ -50,7 +50,14 @@ function StudentReportCard({ student, onPress }: { student: Student; onPress: ()
         <Text style={styles.avatarText}>{student.name[0].toUpperCase()}</Text>
       </View>
       <View style={styles.studentInfo}>
-        <Text style={styles.studentName}>{student.name}</Text>
+        <View style={styles.studentNameRow}>
+          <Text style={styles.studentName}>{student.name}</Text>
+          {className ? (
+            <View style={styles.classBadge}>
+              <Text style={styles.classBadgeText} numberOfLines={1}>{className}</Text>
+            </View>
+          ) : null}
+        </View>
         <Text style={styles.studentStats}>{deliveredCount} de {total} atividades entregues</Text>
         <View style={styles.progressBar}>
           <View style={[styles.progressFill, { width: `${rate}%` as any, backgroundColor: color }]} />
@@ -848,7 +855,11 @@ export default function ReportsScreen() {
           data={filteredStudents}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
-            <StudentReportCard student={item} onPress={() => setSelectedStudent(item)} />
+            <StudentReportCard
+              student={item}
+              onPress={() => setSelectedStudent(item)}
+              className={!selectedClassId ? classes.find(c => c.id === item.classId)?.name ?? null : null}
+            />
           )}
           contentContainerStyle={[styles.list, { paddingBottom: bottomPadding + 100 }]}
           showsVerticalScrollIndicator={false}
@@ -904,7 +915,13 @@ const styles = StyleSheet.create({
   avatarCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 18, fontFamily: 'Inter_700Bold', color: Colors.primary },
   studentInfo: { flex: 1, gap: 4 },
+  studentNameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
   studentName: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: Colors.text },
+  classBadge: {
+    backgroundColor: Colors.surfaceSecondary, borderRadius: 10,
+    paddingHorizontal: 7, paddingVertical: 2,
+  },
+  classBadgeText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: Colors.textSecondary },
   studentStats: { fontSize: 13, fontFamily: 'Inter_400Regular', color: Colors.textSecondary },
   progressBar: { height: 4, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden', marginTop: 4 },
   progressFill: { height: '100%', borderRadius: 2 },

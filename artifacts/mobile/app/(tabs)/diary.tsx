@@ -235,13 +235,22 @@ export default function DiaryScreen() {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: bottomPadding + 100 }}
             >
-              {filteredStudents.map((student, index) => (
+              {filteredStudents.map((student, index) => {
+                const studentClassName = !selectedClassId
+                  ? classes.find(c => c.id === student.classId)?.name ?? null
+                  : null;
+                return (
                 <View
                   key={student.id}
                   style={[styles.studentRow, index % 2 === 0 ? styles.rowEven : styles.rowOdd]}
                 >
                   <View style={styles.nameColumn}>
                     <Text style={styles.studentName} numberOfLines={1}>{student.name}</Text>
+                    {studentClassName ? (
+                      <View style={styles.classBadge}>
+                        <Text style={styles.classBadgeText} numberOfLines={1}>{studentClassName}</Text>
+                      </View>
+                    ) : null}
                   </View>
                   {days.map(day => {
                     const status = getCellStatus(student.id, day);
@@ -282,7 +291,7 @@ export default function DiaryScreen() {
                     </View>
                   </View>
                 </View>
-              ))}
+              ); })}
             </ScrollView>
           </View>
         </ScrollView>
@@ -492,6 +501,12 @@ const styles = StyleSheet.create({
   dayLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: Colors.text },
   todayDayLabel: { color: Colors.primary },
   studentName: { fontSize: 13, fontFamily: 'Inter_500Medium', color: Colors.text },
+  classBadge: {
+    alignSelf: 'flex-start', marginTop: 2,
+    backgroundColor: Colors.surfaceSecondary, borderRadius: 8,
+    paddingHorizontal: 5, paddingVertical: 1,
+  },
+  classBadgeText: { fontSize: 10, fontFamily: 'Inter_500Medium', color: Colors.textSecondary },
   cell: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   cellPresent: { backgroundColor: Colors.successLight },
   cellAbsent: { backgroundColor: Colors.dangerLight },

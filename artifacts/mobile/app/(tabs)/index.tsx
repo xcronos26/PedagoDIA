@@ -33,11 +33,12 @@ function formatDateDisplay(dateStr: string) {
 
 type StudentAction = { student: Student; mode: 'options' | 'edit' | 'moveClass' } | null;
 
-function StudentCard({ student, isAbsent, onToggle, onLongPress }: {
+function StudentCard({ student, isAbsent, onToggle, onLongPress, className }: {
   student: Student;
   isAbsent: boolean;
   onToggle: () => void;
   onLongPress: () => void;
+  className?: string | null;
 }) {
   const scale = useSharedValue(1);
 
@@ -70,9 +71,16 @@ function StudentCard({ student, isAbsent, onToggle, onLongPress }: {
             <Ionicons name="checkmark" size={18} color={Colors.success} />
           )}
         </View>
-        <Text style={[styles.studentName, isAbsent && styles.studentNameAbsent]} numberOfLines={1}>
-          {student.name}
-        </Text>
+        <View style={styles.studentNameContainer}>
+          <Text style={[styles.studentName, isAbsent && styles.studentNameAbsent]} numberOfLines={1}>
+            {student.name}
+          </Text>
+          {className ? (
+            <View style={styles.classBadge}>
+              <Text style={styles.classBadgeText} numberOfLines={1}>{className}</Text>
+            </View>
+          ) : null}
+        </View>
         <View style={[styles.statusBadge, isAbsent ? styles.badgeAbsent : styles.badgePresent]}>
           <Text style={[styles.statusText, isAbsent ? styles.statusTextAbsent : styles.statusTextPresent]}>
             {isAbsent ? 'Falta' : 'Presente'}
@@ -250,6 +258,7 @@ export default function AttendanceScreen() {
               isAbsent={isAbsent(item.id)}
               onToggle={() => toggleAttendance(item.id, selectedDate)}
               onLongPress={() => openOptions(item)}
+              className={!selectedClassId ? classes.find(c => c.id === item.classId)?.name ?? null : null}
             />
           )}
           contentContainerStyle={[styles.list, { paddingBottom: bottomPadding + 100 }]}
@@ -495,8 +504,15 @@ const styles = StyleSheet.create({
   statusIndicator: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   statusPresent: { backgroundColor: Colors.successLight },
   statusAbsent: { backgroundColor: '#FFD5D3' },
-  studentName: { flex: 1, fontSize: 17, fontFamily: 'Inter_500Medium', color: Colors.text },
+  studentNameContainer: { flex: 1, justifyContent: 'center' },
+  studentName: { fontSize: 17, fontFamily: 'Inter_500Medium', color: Colors.text },
   studentNameAbsent: { color: Colors.danger },
+  classBadge: {
+    alignSelf: 'flex-start', marginTop: 3,
+    backgroundColor: Colors.surfaceSecondary, borderRadius: 10,
+    paddingHorizontal: 7, paddingVertical: 2,
+  },
+  classBadgeText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: Colors.textSecondary },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   badgePresent: { backgroundColor: Colors.successLight },
   badgeAbsent: { backgroundColor: '#FFD5D3' },
