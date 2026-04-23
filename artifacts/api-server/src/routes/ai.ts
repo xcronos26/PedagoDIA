@@ -41,6 +41,13 @@ Dados:
 Gere o plano com objetivo, habilidade BNCC, descrição da condução da aula e sugestão de atividade prática.
 Use linguagem simples e prática. Não seja genérico.
 
+Regras de tamanho (obrigatório):
+- Objetivo: no máximo 20 palavras
+- Descrição da aula: no máximo 80 palavras
+- Atividade: no máximo 60 palavras
+- Seja direto e prático, evite explicações longas
+- Não use parágrafos grandes
+
 Responda APENAS com JSON válido, sem markdown:
 {
   "tema": "${tema}",
@@ -92,6 +99,14 @@ ${hasSchedule ? '- Use as disciplinas de acordo com a grade semanal fornecida ac
 - Use linguagem simples e prática
 - Não seja genérico, evite textos longos
 
+Regras de tamanho (obrigatório):
+- Cada dia deve ter no máximo 90 palavras no total
+- Objetivo: até 10 palavras
+- Descrição: até 30 palavras
+- Atividade: até 20 palavras
+- Seja direto e resumido
+- Não escreva textos longos
+
 Responda APENAS com JSON válido, sem markdown:
 {
   "semana": [
@@ -128,6 +143,14 @@ Regras:
 - Crie progressão pedagógica ao longo da semana
 - Para cada dia inclua: tema, objetivo, habilidade BNCC (código e descrição), explicação simples da aula, sugestão de atividade
 - Use linguagem simples e prática
+
+Regras de tamanho (obrigatório):
+- Cada dia deve ter no máximo 90 palavras no total
+- Objetivo: até 10 palavras
+- Descrição: até 30 palavras
+- Atividade: até 20 palavras
+- Seja direto e resumido
+- Não escreva textos longos
 
 Responda APENAS com JSON válido, sem markdown:
 {

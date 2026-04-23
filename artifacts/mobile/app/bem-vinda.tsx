@@ -21,10 +21,10 @@ export const WELCOME_SEEN_KEY = 'pedagogia_welcome_seen';
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
 const FEATURES: { icon: IoniconsName; text: string }[] = [
-  { icon: 'checkmark-circle-outline', text: 'Registre chamadas diárias com rapidez' },
-  { icon: 'book-outline', text: 'Gerencie atividades e acompanhe entregas' },
-  { icon: 'people-outline', text: 'Organize alunos por turma' },
-  { icon: 'bar-chart-outline', text: 'Gere relatórios completos por aluno' },
+  { icon: 'checkmark-circle-outline', text: 'Registrar chamadas diárias com rapidez' },
+  { icon: 'book-outline', text: 'Gerenciar atividades e acompanhar entregas' },
+  { icon: 'people-outline', text: 'Organizar alunos por turma' },
+  { icon: 'bar-chart-outline', text: 'Gerar relatórios completos por aluno' },
 ];
 
 export default function BemVindaScreen() {
