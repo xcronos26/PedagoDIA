@@ -11,6 +11,20 @@ function getGenAI() {
   return new GoogleGenerativeAI(apiKey);
 }
 
+function getAiErrorStatus(err: unknown): number {
+  const e = err as { status?: number };
+  if (e?.status === 429) return 429;
+  if (e?.status === 503) return 503;
+  return 500;
+}
+
+function getAiErrorMessage(err: unknown, fallback: string): string {
+  const status = getAiErrorStatus(err);
+  if (status === 429) return "Limite de requisições da IA atingido. Tente novamente em alguns segundos.";
+  if (status === 503) return "A IA está com alta demanda. Tente novamente em breve.";
+  return fallback;
+}
+
 const SUGGEST_PROMPT = (text: string, serie?: string) => `
 Você é um especialista em pedagogia brasileira e na BNCC (Base Nacional Comum Curricular).
 
@@ -254,7 +268,7 @@ router.post("/ai/generate-plan", requireAuth, async (req, res) => {
     res.json(parsed);
   } catch (err) {
     req.log.error({ err }, "Error in AI generate-plan");
-    res.status(500).json({ error: "Erro ao gerar planejamento" });
+    res.status(getAiErrorStatus(err)).json({ error: getAiErrorMessage(err, "Erro ao gerar planejamento") });
   }
 });
 
@@ -284,7 +298,7 @@ router.post("/ai/generate-activity", requireAuth, async (req, res) => {
     });
   } catch (err) {
     req.log.error({ err }, "Error in AI generate-activity");
-    res.status(500).json({ error: "Erro ao gerar atividade" });
+    res.status(getAiErrorStatus(err)).json({ error: getAiErrorMessage(err, "Erro ao gerar atividade") });
   }
 });
 

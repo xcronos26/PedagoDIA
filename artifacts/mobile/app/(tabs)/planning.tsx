@@ -53,6 +53,49 @@ type DayPlanResult = {
 
 type WeekPlanResult = Record<WeekKey, DayPlanResult>;
 
+type RawWeekApiResult = {
+  semana: Array<{
+    dia: string;
+    tema?: string;
+    objetivo?: string;
+    bncc?: { codigo: string; descricao: string };
+    descricao?: string;
+    atividade?: string;
+    aulas?: Array<{
+      disciplina?: string;
+      tema?: string;
+      objetivo?: string;
+      bncc?: { codigo: string; descricao: string };
+      descricao?: string;
+      atividade?: string;
+    }>;
+  }>;
+};
+
+function normalizeSemanaResult(raw: RawWeekApiResult): WeekPlanResult {
+  const dayNameMap: Record<string, WeekKey> = {
+    'Segunda': 'segunda', 'Segunda-feira': 'segunda',
+    'Terça': 'terca', 'Terça-feira': 'terca', 'Terca': 'terca', 'Terca-feira': 'terca',
+    'Quarta': 'quarta', 'Quarta-feira': 'quarta',
+    'Quinta': 'quinta', 'Quinta-feira': 'quinta',
+    'Sexta': 'sexta', 'Sexta-feira': 'sexta',
+  };
+  const result: Partial<WeekPlanResult> = {};
+  raw.semana.forEach((dia, idx) => {
+    const key: WeekKey = dayNameMap[dia.dia] ?? (WEEK_KEYS[idx] as WeekKey);
+    if (!key) return;
+    const source = dia.aulas && dia.aulas.length > 0 ? dia.aulas[0] : dia;
+    result[key] = {
+      tema: source.tema ?? dia.tema,
+      objetivo: source.objetivo ?? '',
+      bncc: source.bncc,
+      descricao: source.descricao,
+      atividade: source.atividade,
+    };
+  });
+  return result as WeekPlanResult;
+}
+
 type GeneratedActivity = {
   titulo: string;
   descricao: string;
@@ -344,17 +387,35 @@ export default function PlanningScreen() {
       if (aiTipo === 'regente' && teacher?.weeklySchedule) body.weeklySchedule = teacher.weeklySchedule;
       if (aiMode === 'day') body.diaSemana = aiDay;
 
-      const result = await apiFetch<WeekPlanResult | DayPlanResult>('/ai/generate-plan', {
+      const raw = await apiFetch<Record<string, unknown>>('/ai/generate-plan', {
         method: 'POST',
         token,
         body: JSON.stringify(body),
       });
+
+      let result: WeekPlanResult | DayPlanResult;
+      if (aiMode === 'week' && raw?.semana && Array.isArray(raw.semana)) {
+        result = normalizeSemanaResult(raw as unknown as RawWeekApiResult);
+        const hasAnyDay = WEEK_KEYS.some(k => !!(result as WeekPlanResult)[k]);
+        if (!hasAnyDay) {
+          Alert.alert('Erro', 'A IA retornou um formato inesperado. Tente novamente.');
+          return;
+        }
+      } else {
+        result = raw as DayPlanResult;
+      }
+
       setAiResult(result);
       setAiModal(false);
       setAiResultModal(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      Alert.alert('Erro', 'Não foi possível gerar o planejamento. Tente novamente.');
+    } catch (err: unknown) {
+      const apiErr = err as { status?: number; message?: string };
+      if (apiErr?.status === 429 || apiErr?.status === 503) {
+        Alert.alert('IA indisponível', 'A IA está com alta demanda agora. Aguarde um momento e tente novamente.');
+      } else {
+        Alert.alert('Erro', 'Não foi possível gerar o planejamento. Tente novamente.');
+      }
     } finally {
       setAiLoading(false);
     }
@@ -427,8 +488,13 @@ export default function PlanningScreen() {
       });
       setAiActResult(result);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      Alert.alert('Erro', 'Não foi possível gerar a atividade. Tente novamente.');
+    } catch (err: unknown) {
+      const apiErr = err as { status?: number };
+      if (apiErr?.status === 429 || apiErr?.status === 503) {
+        Alert.alert('IA indisponível', 'A IA está com alta demanda agora. Aguarde um momento e tente novamente.');
+      } else {
+        Alert.alert('Erro', 'Não foi possível gerar a atividade. Tente novamente.');
+      }
     } finally {
       setAiActLoading(false);
     }
