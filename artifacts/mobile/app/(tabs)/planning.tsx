@@ -685,9 +685,10 @@ export default function PlanningScreen() {
 
       {/* ── Create New Activity Modal ─────────────────────── */}
       <Modal visible={createModal} transparent animationType="slide">
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <TouchableOpacity style={modal.overlay} activeOpacity={1} onPress={() => setCreateModal(false)}>
-            <View style={[modal.sheet, { paddingBottom: insets.bottom + 16 }]} onStartShouldSetResponder={() => true}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.38)' }}>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setCreateModal(false)} />
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
+            <View style={[modal.sheet, { paddingBottom: insets.bottom + 16 }]}>
               <View style={modal.handle} />
               <Text style={modal.title}>Nova atividade</Text>
               {subjects.length > 0 && (
@@ -748,15 +749,16 @@ export default function PlanningScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </TouchableOpacity>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* ── AI Plan Config Modal ──────────────────────────── */}
       <Modal visible={aiModal} transparent animationType="slide">
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <TouchableOpacity style={modal.overlay} activeOpacity={1} onPress={() => !aiLoading && setAiModal(false)}>
-            <View style={[modal.sheet, { paddingBottom: insets.bottom + 16 }]} onStartShouldSetResponder={() => true}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.38)' }}>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => !aiLoading && setAiModal(false)} />
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
+            <View style={[modal.sheet, { paddingBottom: insets.bottom + 16 }]}>
               <View style={modal.handle} />
               <View style={ai.header}>
                 <View style={ai.headerIcon}>
@@ -872,8 +874,8 @@ export default function PlanningScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </TouchableOpacity>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* ── AI Plan Result Modal ──────────────────────────── */}
@@ -950,9 +952,10 @@ export default function PlanningScreen() {
 
       {/* ── AI Activity Modal ─────────────────────────────── */}
       <Modal visible={aiActModal} transparent animationType="slide">
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <TouchableOpacity style={modal.overlay} activeOpacity={1} onPress={() => !aiActLoading && setAiActModal(false)}>
-            <View style={[modal.sheet, { paddingBottom: insets.bottom + 16 }]} onStartShouldSetResponder={() => true}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.38)' }}>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => !aiActLoading && setAiActModal(false)} />
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
+            <View style={[modal.sheet, { paddingBottom: insets.bottom + 16 }]}>
               <View style={modal.handle} />
               <View style={ai.header}>
                 <View style={ai.headerIcon}>
@@ -1057,8 +1060,8 @@ export default function PlanningScreen() {
                 )}
               </ScrollView>
             </View>
-          </TouchableOpacity>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
     </View>
   );
