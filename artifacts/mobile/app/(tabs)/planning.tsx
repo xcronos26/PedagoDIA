@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/colors';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, WeeklySchedule } from '@/context/AuthContext';
 import { useApp, Activity } from '@/context/AppContext';
 import { apiFetch } from '@/utils/api';
 import { toISO, getBrasiliaDate } from '@/utils/date';
@@ -26,6 +26,11 @@ const MONTH_NAMES = [
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ];
 const WEEKDAY_PT = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'];
+const WEEK_KEYS = ['segunda', 'terca', 'quarta', 'quinta', 'sexta'] as const;
+type WeekKey = typeof WEEK_KEYS[number];
+
+const AI_PURPLE = '#7C3AED';
+const AI_PURPLE_LIGHT = '#EDE9FE';
 
 type LessonPlan = {
   id: string;
@@ -33,6 +38,15 @@ type LessonPlan = {
   description: string;
   activityIds: string[];
 };
+
+type DayPlanResult = {
+  objetivo: string;
+  habilidade_bncc: string;
+  descritivo: string;
+  atividade_sugerida: string;
+};
+
+type WeekPlanResult = Record<WeekKey, DayPlanResult>;
 
 function getMonday(date: Date): Date {
   const d = new Date(date);
@@ -53,9 +67,17 @@ function getWeekDays(monday: Date): Date[] {
   return Array.from({ length: 5 }, (_, i) => addDays(monday, i));
 }
 
+function formatDayDescription(plan: DayPlanResult): string {
+  const parts = [];
+  if (plan.objetivo) parts.push(plan.objetivo);
+  if (plan.descritivo) parts.push(plan.descritivo);
+  if (plan.habilidade_bncc) parts.push(`Habilidade BNCC: ${plan.habilidade_bncc}`);
+  return parts.join('\n');
+}
+
 export default function PlanningScreen() {
   const insets = useSafeAreaInsets();
-  const { token } = useAuth();
+  const { token, teacher } = useAuth();
   const { activities, addActivity } = useApp();
   const topPadding = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPadding = Platform.OS === 'web' ? 34 : 0;
@@ -76,6 +98,19 @@ export default function PlanningScreen() {
   const [savingDesc, setSavingDesc] = useState<Record<string, boolean>>({});
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
+
+  // AI state
+  const [aiModal, setAiModal] = useState(false);
+  const [aiMode, setAiMode] = useState<'week' | 'day'>('week');
+  const [aiTipo, setAiTipo] = useState<'regente' | 'disciplina'>('regente');
+  const [aiSerie, setAiSerie] = useState('');
+  const [aiDisciplina, setAiDisciplina] = useState('');
+  const [aiTema, setAiTema] = useState('');
+  const [aiDay, setAiDay] = useState<WeekKey>('segunda');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<WeekPlanResult | DayPlanResult | null>(null);
+  const [aiResultModal, setAiResultModal] = useState(false);
+  const [applyingAi, setApplyingAi] = useState(false);
 
   const mondayISO = toISO(monday);
 
@@ -236,6 +271,88 @@ export default function PlanningScreen() {
     }
   };
 
+  // AI: open modal with prefilled data from teacher profile
+  const openAiModal = () => {
+    setAiModal(true);
+    setAiResult(null);
+  };
+
+  const handleGeneratePlan = async () => {
+    if (!aiSerie.trim() || !token) {
+      Alert.alert('Atenção', 'Informe a série para gerar o planejamento.');
+      return;
+    }
+    if (aiTipo === 'disciplina' && !aiDisciplina.trim()) {
+      Alert.alert('Atenção', 'Informe a disciplina.');
+      return;
+    }
+    setAiLoading(true);
+    try {
+      const body: Record<string, unknown> = {
+        mode: aiMode,
+        serie: aiSerie.trim(),
+        tipo: aiTipo,
+        tema: aiTema.trim() || undefined,
+      };
+      if (aiTipo === 'disciplina') body.disciplina = aiDisciplina.trim();
+      if (aiTipo === 'regente' && teacher?.weeklySchedule) {
+        body.weeklySchedule = teacher.weeklySchedule;
+      }
+      if (aiMode === 'day') body.diaSemana = aiDay;
+
+      const result = await apiFetch<WeekPlanResult | DayPlanResult>('/ai/generate-plan', {
+        method: 'POST',
+        token,
+        body: JSON.stringify(body),
+      });
+
+      setAiResult(result);
+      setAiModal(false);
+      setAiResultModal(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert('Erro', 'Não foi possível gerar o planejamento. Tente novamente.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleApplyWeekPlan = async () => {
+    if (!aiResult || aiMode !== 'week') return;
+    const weekResult = aiResult as WeekPlanResult;
+    setApplyingAi(true);
+    try {
+      const saves = WEEK_KEYS.map((key, idx) => {
+        const dayPlan = weekResult[key];
+        if (!dayPlan) return null;
+        const dateStr = toISO(weekDays[idx]);
+        const desc = formatDayDescription(dayPlan);
+        setDescEdits(prev => ({ ...prev, [dateStr]: desc }));
+        return saveDescription(dateStr, desc);
+      }).filter(Boolean);
+      await Promise.all(saves);
+      setAiResultModal(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert('Erro', 'Não foi possível aplicar o planejamento.');
+    } finally {
+      setApplyingAi(false);
+    }
+  };
+
+  const handleApplyDayPlan = async () => {
+    if (!aiResult || aiMode !== 'day') return;
+    const dayResult = aiResult as DayPlanResult;
+    const dayIdx = WEEK_KEYS.indexOf(aiDay);
+    if (dayIdx === -1) return;
+    const dateStr = toISO(weekDays[dayIdx]);
+    const desc = formatDayDescription(dayResult);
+    setDescEdits(prev => ({ ...prev, [dateStr]: desc }));
+    await saveDescription(dateStr, desc);
+    setAiResultModal(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
   const subjects = useMemo(() => Array.from(new Set(activities.map(a => a.subject))), [activities]);
   const todayISO = useMemo(() => toISO(getBrasiliaDate()), []);
   const displayMonth = monday.getMonth();
@@ -251,6 +368,12 @@ export default function PlanningScreen() {
     const linked = new Set(plansByDate[activeDayDate]?.activityIds ?? []);
     return activities.filter(a => !linked.has(a.id));
   }, [activities, activeDayDate, plansByDate]);
+
+  const weekResultEntries = useMemo(() => {
+    if (!aiResult || aiMode !== 'week') return [];
+    const wr = aiResult as WeekPlanResult;
+    return WEEK_KEYS.map((key, idx) => ({ key, label: WEEKDAY_PT[idx], plan: wr[key] })).filter(e => !!e.plan);
+  }, [aiResult, aiMode]);
 
   return (
     <View style={[styles.container, { paddingTop: topPadding }]}>
@@ -281,6 +404,12 @@ export default function PlanningScreen() {
           <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
         </TouchableOpacity>
       </View>
+
+      {/* AI Generate Button */}
+      <TouchableOpacity style={styles.aiBtn} onPress={openAiModal} activeOpacity={0.85}>
+        <Ionicons name="sparkles" size={15} color={AI_PURPLE} />
+        <Text style={styles.aiBtnText}>Gerar planejamento com IA</Text>
+      </TouchableOpacity>
 
       {/* Day Cards */}
       <ScrollView
@@ -497,6 +626,208 @@ export default function PlanningScreen() {
           </TouchableOpacity>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* AI Config Modal */}
+      <Modal visible={aiModal} transparent animationType="slide">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <TouchableOpacity style={modal.overlay} activeOpacity={1} onPress={() => !aiLoading && setAiModal(false)}>
+            <View style={[modal.sheet, { paddingBottom: insets.bottom + 16 }]} onStartShouldSetResponder={() => true}>
+              <View style={modal.handle} />
+
+              {/* AI Header */}
+              <View style={ai.header}>
+                <View style={ai.headerIcon}>
+                  <Ionicons name="sparkles" size={18} color={AI_PURPLE} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={ai.headerTitle}>Gerar com IA</Text>
+                  <Text style={ai.headerSub}>Planejamento pedagógico baseado na BNCC</Text>
+                </View>
+              </View>
+
+              <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                {/* Mode toggle */}
+                <Text style={ai.label}>Período</Text>
+                <View style={modal.typeRow}>
+                  <TouchableOpacity
+                    style={[modal.typeBtn, aiMode === 'week' && { borderColor: AI_PURPLE, backgroundColor: AI_PURPLE_LIGHT }]}
+                    onPress={() => setAiMode('week')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[modal.typeBtnText, aiMode === 'week' && { color: AI_PURPLE }]}>Semana inteira</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[modal.typeBtn, aiMode === 'day' && { borderColor: AI_PURPLE, backgroundColor: AI_PURPLE_LIGHT }]}
+                    onPress={() => setAiMode('day')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[modal.typeBtnText, aiMode === 'day' && { color: AI_PURPLE }]}>Dia específico</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Day picker (only when mode = day) */}
+                {aiMode === 'day' && (
+                  <>
+                    <Text style={ai.label}>Dia da semana</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        {WEEK_KEYS.map((key, idx) => (
+                          <TouchableOpacity
+                            key={key}
+                            style={[modal.chip, aiDay === key && { backgroundColor: AI_PURPLE, borderColor: AI_PURPLE }]}
+                            onPress={() => setAiDay(key)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={[modal.chipText, aiDay === key && { color: '#fff' }]}>{WEEKDAY_PT[idx]}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </ScrollView>
+                  </>
+                )}
+
+                {/* Tipo toggle */}
+                <Text style={ai.label}>Tipo de professor</Text>
+                <View style={modal.typeRow}>
+                  <TouchableOpacity
+                    style={[modal.typeBtn, aiTipo === 'regente' && { borderColor: AI_PURPLE, backgroundColor: AI_PURPLE_LIGHT }]}
+                    onPress={() => setAiTipo('regente')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[modal.typeBtnText, aiTipo === 'regente' && { color: AI_PURPLE }]}>Regente</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[modal.typeBtn, aiTipo === 'disciplina' && { borderColor: AI_PURPLE, backgroundColor: AI_PURPLE_LIGHT }]}
+                    onPress={() => setAiTipo('disciplina')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[modal.typeBtnText, aiTipo === 'disciplina' && { color: AI_PURPLE }]}>Disciplina</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Disciplina input */}
+                {aiTipo === 'disciplina' && (
+                  <>
+                    <Text style={ai.label}>Disciplina</Text>
+                    <TextInput
+                      style={modal.input}
+                      placeholder="ex: Matemática, Português..."
+                      placeholderTextColor={Colors.textTertiary}
+                      value={aiDisciplina}
+                      onChangeText={setAiDisciplina}
+                    />
+                  </>
+                )}
+
+                {/* Série */}
+                <Text style={ai.label}>Série / Ano</Text>
+                <TextInput
+                  style={modal.input}
+                  placeholder="ex: 3º ano, 5º ano..."
+                  placeholderTextColor={Colors.textTertiary}
+                  value={aiSerie}
+                  onChangeText={setAiSerie}
+                />
+
+                {/* Tema (optional) */}
+                <Text style={ai.label}>Tema / Contexto <Text style={{ color: Colors.textTertiary, fontFamily: 'Inter_400Regular' }}>(opcional)</Text></Text>
+                <TextInput
+                  style={modal.input}
+                  placeholder="ex: Primavera, Folclore, Geometria..."
+                  placeholderTextColor={Colors.textTertiary}
+                  value={aiTema}
+                  onChangeText={setAiTema}
+                />
+              </ScrollView>
+
+              <View style={modal.btnRow}>
+                <TouchableOpacity style={modal.closeBtn} onPress={() => setAiModal(false)} disabled={aiLoading} activeOpacity={0.8}>
+                  <Text style={modal.closeBtnText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[ai.generateBtn, aiLoading && { opacity: 0.7 }]}
+                  onPress={handleGeneratePlan}
+                  disabled={aiLoading}
+                  activeOpacity={0.85}
+                >
+                  {aiLoading ? (
+                    <>
+                      <ActivityIndicator size="small" color="#fff" />
+                      <Text style={ai.generateBtnText}>Gerando...</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="sparkles" size={15} color="#fff" />
+                      <Text style={ai.generateBtnText}>Gerar</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* AI Result Modal */}
+      <Modal visible={aiResultModal} transparent animationType="slide">
+        <TouchableOpacity style={modal.overlay} activeOpacity={1} onPress={() => !applyingAi && setAiResultModal(false)}>
+          <View style={[modal.sheet, { paddingBottom: insets.bottom + 16, maxHeight: '90%' }]} onStartShouldSetResponder={() => true}>
+            <View style={modal.handle} />
+            <View style={ai.header}>
+              <View style={ai.headerIcon}>
+                <Ionicons name="sparkles" size={18} color={AI_PURPLE} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={ai.headerTitle}>Planejamento gerado</Text>
+                <Text style={ai.headerSub}>Revise e aplique ao seu calendário</Text>
+              </View>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+              {aiMode === 'week' && weekResultEntries.map(({ key, label, plan }) => (
+                <View key={key} style={ai.resultCard}>
+                  <Text style={ai.resultDay}>{label}</Text>
+                  {plan.objetivo ? <Text style={ai.resultText}><Text style={ai.resultLabel}>Objetivo: </Text>{plan.objetivo}</Text> : null}
+                  {plan.descritivo ? <Text style={ai.resultText}><Text style={ai.resultLabel}>Descritivo: </Text>{plan.descritivo}</Text> : null}
+                  {plan.habilidade_bncc ? <Text style={ai.resultText}><Text style={ai.resultLabel}>BNCC: </Text>{plan.habilidade_bncc}</Text> : null}
+                  {plan.atividade_sugerida ? <Text style={ai.resultText}><Text style={ai.resultLabel}>Atividade sugerida: </Text>{plan.atividade_sugerida}</Text> : null}
+                </View>
+              ))}
+
+              {aiMode === 'day' && aiResult && (
+                <View style={ai.resultCard}>
+                  <Text style={ai.resultDay}>{WEEKDAY_PT[WEEK_KEYS.indexOf(aiDay)]}</Text>
+                  {(aiResult as DayPlanResult).objetivo ? <Text style={ai.resultText}><Text style={ai.resultLabel}>Objetivo: </Text>{(aiResult as DayPlanResult).objetivo}</Text> : null}
+                  {(aiResult as DayPlanResult).descritivo ? <Text style={ai.resultText}><Text style={ai.resultLabel}>Descritivo: </Text>{(aiResult as DayPlanResult).descritivo}</Text> : null}
+                  {(aiResult as DayPlanResult).habilidade_bncc ? <Text style={ai.resultText}><Text style={ai.resultLabel}>BNCC: </Text>{(aiResult as DayPlanResult).habilidade_bncc}</Text> : null}
+                  {(aiResult as DayPlanResult).atividade_sugerida ? <Text style={ai.resultText}><Text style={ai.resultLabel}>Atividade sugerida: </Text>{(aiResult as DayPlanResult).atividade_sugerida}</Text> : null}
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={modal.btnRow}>
+              <TouchableOpacity style={modal.closeBtn} onPress={() => setAiResultModal(false)} disabled={applyingAi} activeOpacity={0.8}>
+                <Text style={modal.closeBtnText}>Descartar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[ai.generateBtn, applyingAi && { opacity: 0.7 }]}
+                onPress={aiMode === 'week' ? handleApplyWeekPlan : handleApplyDayPlan}
+                disabled={applyingAi}
+                activeOpacity={0.85}
+              >
+                {applyingAi ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                    <Text style={ai.generateBtnText}>Aplicar</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -541,6 +872,26 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
     color: Colors.text,
+  },
+
+  aiBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    marginHorizontal: 14,
+    marginTop: 12,
+    marginBottom: 2,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: AI_PURPLE_LIGHT,
+    borderWidth: 1.5,
+    borderColor: AI_PURPLE + '40',
+  },
+  aiBtnText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+    color: AI_PURPLE,
   },
 
   scroll: {
@@ -706,7 +1057,7 @@ const modal = StyleSheet.create({
     backgroundColor: Colors.surfaceSecondary, alignItems: 'center', marginTop: 12,
   },
   closeBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: Colors.text },
-  typeRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  typeRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   typeBtn: {
     flex: 1, paddingVertical: 8, borderRadius: 10,
     borderWidth: 1.5, borderColor: Colors.border, alignItems: 'center',
@@ -722,7 +1073,7 @@ const modal = StyleSheet.create({
   input: {
     fontFamily: 'Inter_400Regular', fontSize: 15, color: Colors.text,
     borderWidth: 1.5, borderColor: Colors.border, borderRadius: 12,
-    padding: 12, backgroundColor: Colors.background, marginBottom: 12,
+    padding: 12, backgroundColor: Colors.background, marginBottom: 14,
   },
   btnRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
   confirmBtn: {
@@ -730,4 +1081,48 @@ const modal = StyleSheet.create({
     backgroundColor: Colors.primary, alignItems: 'center',
   },
   confirmText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: '#fff' },
+});
+
+const ai = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20,
+  },
+  headerIcon: {
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: AI_PURPLE_LIGHT,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  headerTitle: { fontFamily: 'Inter_700Bold', fontSize: 17, color: Colors.text },
+  headerSub: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textSecondary, marginTop: 1 },
+  label: {
+    fontFamily: 'Inter_600SemiBold', fontSize: 13,
+    color: Colors.text, marginBottom: 8,
+  },
+  generateBtn: {
+    flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 12, borderRadius: 12,
+    backgroundColor: AI_PURPLE, marginTop: 12,
+  },
+  generateBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: '#fff' },
+  resultCard: {
+    backgroundColor: AI_PURPLE_LIGHT,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: AI_PURPLE + '25',
+  },
+  resultDay: {
+    fontFamily: 'Inter_700Bold', fontSize: 15,
+    color: AI_PURPLE, marginBottom: 4,
+  },
+  resultLabel: { fontFamily: 'Inter_600SemiBold', color: Colors.text },
+  resultText: {
+    fontFamily: 'Inter_400Regular', fontSize: 13,
+    color: Colors.text, lineHeight: 19,
+  },
 });
