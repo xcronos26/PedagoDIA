@@ -614,7 +614,9 @@ export default function Home() {
               <p className="font-medium text-white/80">
                 Siga-nos:{" "}
                 <a
-                  href="https://instagram.com/pedagodia.app"
+                  href="https://www.instagram.com/pedagodia.app/"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-[#FBBF24] hover:text-[#f59e0b] transition-colors"
                   data-testid="link-social-instagram"
                 >
@@ -635,9 +637,21 @@ export default function Home() {
             <div>
               <h4 className="text-white font-bold mb-4 uppercase tracking-wider text-sm">Contato</h4>
               <ul className="space-y-3 text-sm">
-                <li><a href="mailto:contato@pedagodia.com.br" className="hover:text-white transition-colors">contato@pedagodia.com.br</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Termos de Uso</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Política de Privacidade</a></li>
+                <li>
+                  <a href="mailto:lucasde94@gmail.com" className="hover:text-white transition-colors">
+                    Fale conosco
+                  </a>
+                </li>
+                <li>
+                  <a href="/termos-e-privacidade.pdf" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
+                    Termos de Uso
+                  </a>
+                </li>
+                <li>
+                  <a href="/termos-e-privacidade.pdf" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
+                    Política de Privacidade
+                  </a>
+                </li>
               </ul>
             </div>
           </div>
