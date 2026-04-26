@@ -1,9 +1,10 @@
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { Navbar } from "@/components/Navbar";
 import { PhoneFrame } from "@/components/PhoneFrame";
 import { LaptopFrame } from "@/components/LaptopFrame";
 import { Button } from "@/components/ui/button";
-import { motion, type Variants } from "framer-motion";
+import { motion, type Variants, AnimatePresence } from "framer-motion";
 import {
   Clock,
   BookOpen,
@@ -14,6 +15,7 @@ import {
   Zap,
   Users,
   Package,
+  Check,
 } from "lucide-react";
 
 const fadeUp: Variants = {
@@ -26,31 +28,39 @@ const stagger: Variants = {
   show: { transition: { staggerChildren: 0.12 } },
 };
 
+const heroScreenshots = [
+  { src: "/screenshots/chamada.jpeg", alt: "Tela de Chamada" },
+  { src: "/screenshots/menu.jpeg", alt: "Menu Principal" },
+  { src: "/screenshots/atividades.jpeg", alt: "Atividades" },
+  { src: "/screenshots/diario.jpeg", alt: "Diário" },
+  { src: "/screenshots/relatorio-aluno.jpeg", alt: "Relatório do Aluno" },
+];
+
 export default function Home() {
+  const [heroIdx, setHeroIdx] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      setHeroIdx((i) => (i + 1) % heroScreenshots.length);
+    }, 2800);
+    return () => clearInterval(t);
+  }, []);
+
   return (
     <div className="min-h-screen bg-background font-sans overflow-x-hidden">
       <Navbar />
 
       {/* ───────── HERO ───────── */}
       <section className="relative pt-28 pb-20 md:pt-36 md:pb-32 overflow-hidden">
-        {/* purple→orange gradient background */}
         <div
           className="absolute inset-0 z-0"
-          style={{
-            background:
-              "linear-gradient(135deg, #7C3AED 0%, #a855f7 40%, #F97316 100%)",
-          }}
+          style={{ background: "linear-gradient(135deg, #7C3AED 0%, #a855f7 40%, #F97316 100%)" }}
         />
         <div className="absolute inset-0 z-0 bg-black/20" />
 
         <div className="container relative z-10 mx-auto px-4 md:px-6">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <motion.div
-              initial="hidden"
-              animate="show"
-              variants={stagger}
-              className="text-white"
-            >
+            <motion.div initial="hidden" animate="show" variants={stagger} className="text-white">
               <motion.span
                 variants={fadeUp}
                 className="inline-block bg-white/20 text-white text-sm font-semibold px-4 py-1.5 rounded-full mb-6 backdrop-blur-sm border border-white/30"
@@ -63,17 +73,15 @@ export default function Home() {
                 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight mb-6"
               >
                 Devolva o tempo <br />
-                ao{" "}
-                <span className="text-[#FBBF24]">professor</span>
+                ao <span className="text-[#FBBF24]">professor</span>
               </motion.h1>
 
               <motion.p
                 variants={fadeUp}
                 className="text-lg md:text-xl text-white/85 mb-8 max-w-lg leading-relaxed"
               >
-                O caderno digital que transforma horas perdidas em tempo de
-                ensino. Chamada, diário, atividades e relatórios — tudo em um
-                só lugar. Rápido, sem fricção, sem burocracia.
+                A plataforma que transforma horas perdidas em tempo de ensino.
+                Chamada, diário, atividades e relatórios, tudo em um só lugar.
               </motion.p>
 
               <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-4 mb-10">
@@ -103,24 +111,45 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
-                <span>+5.000 professores já usam diariamente</span>
+                <span>+39 professores já usam diariamente</span>
               </motion.div>
             </motion.div>
 
-            {/* Floating phone mockup — Chamada screenshot */}
+            {/* Auto-rotating phone screenshots */}
             <motion.div
               initial={{ opacity: 0, x: 60 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
+              transition={{ duration: 0.8, ease: "easeOut" as const }}
               className="relative flex justify-center lg:justify-end"
             >
               <div className="relative">
                 <div className="absolute -inset-6 bg-white/10 blur-2xl rounded-full" />
-                <PhoneFrame
-                  src="/screenshots/chamada.jpeg"
-                  alt="Chamada de presença no PedagoDIA"
-                  className="rotate-[-3deg] hover:rotate-0 transition-transform duration-500"
-                />
+                <div className="relative rotate-[-3deg] hover:rotate-0 transition-transform duration-500">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={heroIdx}
+                      initial={{ opacity: 0, scale: 0.96 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.96 }}
+                      transition={{ duration: 0.4 }}
+                    >
+                      <PhoneFrame
+                        src={heroScreenshots[heroIdx].src}
+                        alt={heroScreenshots[heroIdx].alt}
+                      />
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+                {/* Dots indicator */}
+                <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 flex gap-1.5">
+                  {heroScreenshots.map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setHeroIdx(i)}
+                      className={`w-1.5 h-1.5 rounded-full transition-all ${i === heroIdx ? "bg-white w-4" : "bg-white/40"}`}
+                    />
+                  ))}
+                </div>
                 {/* Floating badge */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
@@ -133,7 +162,7 @@ export default function Home() {
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 font-medium">Economize até</p>
-                    <p className="text-lg font-extrabold text-[#7C3AED]">10h por semana</p>
+                    <p className="text-lg font-extrabold text-[#7C3AED]">5h por semana</p>
                   </div>
                 </motion.div>
               </div>
@@ -146,11 +175,8 @@ export default function Home() {
       <section className="py-24 bg-[#1E1B4B]">
         <div className="container mx-auto px-4 md:px-6">
           <motion.div
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-80px" }}
-            variants={stagger}
-            className="text-center mb-16"
+            initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }}
+            variants={stagger} className="text-center mb-16"
           >
             <motion.p variants={fadeUp} className="text-[#FBBF24] font-semibold text-sm uppercase tracking-widest mb-3">
               O Problema
@@ -161,41 +187,32 @@ export default function Home() {
           </motion.div>
 
           <motion.div
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-60px" }}
-            variants={stagger}
-            className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto"
+            initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }}
+            variants={stagger} className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto"
           >
             {[
               {
-                num: "01",
-                icon: <Clock className="w-6 h-6" />,
+                num: "01", icon: <Clock className="w-6 h-6" />,
                 title: "Chamada Manual",
                 desc: "Anotar presença em papel, calcular faltas manualmente, transcrever para planilhas. Minutos preciosos perdidos em cada aula.",
               },
               {
-                num: "02",
-                icon: <BookOpen className="w-6 h-6" />,
+                num: "02", icon: <BookOpen className="w-6 h-6" />,
                 title: "Planejamento Demorado",
                 desc: "Horas elaborando planos de aula do zero, sem assistência. Tempo que poderia ser dedicado à preparação pedagógica real.",
               },
               {
-                num: "03",
-                icon: <FileText className="w-6 h-6" />,
+                num: "03", icon: <FileText className="w-6 h-6" />,
                 title: "Burocracia Asfixiante",
                 desc: "Relatórios, diários de classe e documentações empilhadas. A papelada toma espaço que deveria ser do aprendizado.",
               },
             ].map((card) => (
               <motion.div
-                key={card.num}
-                variants={fadeUp}
+                key={card.num} variants={fadeUp}
                 className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-sm hover:bg-white/10 transition-colors"
               >
                 <div className="flex items-start gap-4 mb-6">
-                  <span className="text-5xl font-black text-[#7C3AED]/40 leading-none select-none">
-                    {card.num}
-                  </span>
+                  <span className="text-5xl font-black text-[#7C3AED]/40 leading-none select-none">{card.num}</span>
                   <div className="w-12 h-12 rounded-xl bg-[#7C3AED]/30 flex items-center justify-center text-[#a78bfa]">
                     {card.icon}
                   </div>
@@ -208,15 +225,12 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ───────── APP SCREENS SHOWCASE (6 screenshots) ───────── */}
+      {/* ───────── APP SCREENS SHOWCASE ───────── */}
       <section className="py-24 bg-background">
         <div className="container mx-auto px-4 md:px-6">
           <motion.div
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-80px" }}
-            variants={stagger}
-            className="text-center mb-16"
+            initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }}
+            variants={stagger} className="text-center mb-16"
           >
             <motion.p variants={fadeUp} className="text-[#F97316] font-semibold text-sm uppercase tracking-widest mb-3">
               O Aplicativo
@@ -230,20 +244,17 @@ export default function Home() {
           </motion.div>
 
           <motion.div
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-60px" }}
+            initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }}
             variants={stagger}
-            className="grid grid-cols-2 md:grid-cols-3 gap-8 md:gap-12 items-start max-w-5xl mx-auto"
+            className="grid grid-cols-3 gap-6 md:gap-10 items-start max-w-5xl mx-auto"
           >
+            {/* Row 1: 3 phone frames */}
             {[
               { src: "/screenshots/menu.jpeg", caption: "Tudo centralizado", label: "Menu Principal" },
               { src: "/screenshots/chamada.jpeg", caption: "Chamada com 1 clique", label: "Chamada" },
               { src: "/screenshots/atividades.jpeg", caption: "Controle de entregas", label: "Atividades" },
-              { src: "/screenshots/diario.jpeg", caption: "Histórico completo", label: "Diário" },
-              { src: "/screenshots/relatorio-aluno.jpeg", caption: "Acompanhamento por aluno", label: "Relatório do Aluno" },
             ].map((screen) => (
-              <motion.div key={screen.src} variants={fadeUp} className="flex flex-col items-center gap-4">
+              <motion.div key={screen.src} variants={fadeUp} className="flex flex-col items-center gap-3">
                 <PhoneFrame src={screen.src} alt={screen.label} />
                 <div className="text-center">
                   <p className="font-semibold text-foreground text-sm">{screen.caption}</p>
@@ -251,8 +262,17 @@ export default function Home() {
                 </div>
               </motion.div>
             ))}
-            {/* Web report — spans 2 cols on mobile, centered on md */}
-            <motion.div variants={fadeUp} className="flex flex-col items-center gap-4 col-span-2 md:col-span-1">
+
+            {/* Row 2: 1 phone + web report spanning 2 cols */}
+            <motion.div variants={fadeUp} className="flex flex-col items-center gap-3">
+              <PhoneFrame src="/screenshots/relatorio-aluno.jpeg" alt="Relatório do Aluno" />
+              <div className="text-center">
+                <p className="font-semibold text-foreground text-sm">Acompanhamento por aluno</p>
+                <p className="text-xs text-muted-foreground">Relatório do Aluno</p>
+              </div>
+            </motion.div>
+
+            <motion.div variants={fadeUp} className="col-span-2 flex flex-col items-center gap-3">
               <LaptopFrame src="/screenshots/relatorio-web.png" alt="Relatório Web" />
               <div className="text-center">
                 <p className="font-semibold text-foreground text-sm">Relatório web completo</p>
@@ -263,15 +283,12 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ───────── VERSÃO WEB E APP ───────── */}
-      <section className="py-24 bg-muted/30">
+      {/* ───────── VERSÃO WEB ───────── */}
+      <section className="py-20 bg-muted/30">
         <div className="container mx-auto px-4 md:px-6">
           <motion.div
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-80px" }}
-            variants={stagger}
-            className="text-center mb-16"
+            initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }}
+            variants={stagger} className="text-center mb-12"
           >
             <motion.p variants={fadeUp} className="text-[#7C3AED] font-semibold text-sm uppercase tracking-widest mb-3">
               Disponível em
@@ -280,82 +297,194 @@ export default function Home() {
               Versão Web e App
             </motion.h2>
             <motion.p variants={fadeUp} className="text-muted-foreground text-lg mt-4 max-w-xl mx-auto">
-              Gerencie sua turma pelo celular em sala de aula, e aprofunde análises no computador. Uma conta, duas experiências completas.
+              Acesse pelo navegador agora e futuramente nas lojas de app.
             </motion.p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {/* Plataforma Web */}
-            <motion.div
-              initial={{ opacity: 0, x: -30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 flex flex-col items-start"
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 rounded-xl bg-[#7C3AED]/10 flex items-center justify-center">
-                  <Monitor className="w-6 h-6 text-[#7C3AED]" />
-                </div>
-                <div>
-                  <span className="inline-block bg-[#7C3AED]/10 text-[#7C3AED] text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-wide mb-1">
-                    Disponível agora
-                  </span>
-                  <h3 className="text-xl font-bold text-gray-900">Plataforma Web</h3>
-                </div>
+          {/* Plataforma Web — imagem à esquerda, texto à direita */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }} transition={{ duration: 0.6 }}
+            className="flex flex-col md:flex-row items-center gap-12 max-w-5xl mx-auto mb-20"
+          >
+            <div className="w-full md:w-1/2 overflow-hidden rounded-2xl shadow-2xl border border-gray-200">
+              <img
+                src="/screenshots/relatorio-web.png"
+                alt="Plataforma Web PedagoDIA"
+                className="w-full object-cover"
+                data-testid="img-plataforma-web"
+              />
+            </div>
+            <div className="w-full md:w-1/2">
+              <div className="inline-flex items-center gap-2 bg-[#7C3AED]/10 text-[#7C3AED] text-sm font-bold px-3 py-1 rounded-full mb-5">
+                <Monitor className="w-4 h-4" /> Disponível agora
               </div>
-              <p className="text-gray-600 leading-relaxed mb-6">
-                Acesse pelo navegador, em qualquer computador ou tablet. Relatórios de desempenho, gestão de turmas, diário de classe e planejamento — com visão completa da sua escola.
+              <h3 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">Plataforma Web</h3>
+              <p className="text-gray-600 leading-relaxed mb-6 text-lg">
+                Acesse pelo navegador, em qualquer computador ou tablet. Relatórios de desempenho, gestão de turmas, diário de classe e planejamento com visão completa da sua escola.
               </p>
-              <div className="mt-auto w-full overflow-hidden rounded-xl border border-gray-100">
-                <img
-                  src="/screenshots/relatorio-web.png"
-                  alt="Plataforma Web PedagoDIA"
-                  className="w-full object-cover"
-                  data-testid="img-plataforma-web"
-                />
-              </div>
-              <a href="/web/" className="mt-6 w-full" data-testid="link-acessar-web">
-                <Button className="w-full bg-[#7C3AED] hover:bg-[#6d28d9] text-white font-bold">
+              <a href="/web/" data-testid="link-acessar-web">
+                <Button className="bg-[#7C3AED] hover:bg-[#6d28d9] text-white font-bold px-8">
                   Acessar a plataforma →
+                </Button>
+              </a>
+            </div>
+          </motion.div>
+
+          {/* App — texto à esquerda, imagem à direita */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }} transition={{ duration: 0.6 }}
+            className="flex flex-col md:flex-row-reverse items-center gap-12 max-w-5xl mx-auto"
+          >
+            <div className="w-full md:w-1/3 flex justify-center">
+              <PhoneFrame src="/screenshots/menu.jpeg" alt="App PedagoDIA" />
+            </div>
+            <div className="w-full md:w-2/3">
+              <div className="inline-flex items-center gap-2 bg-[#FBBF24]/20 text-[#92400e] text-sm font-bold px-3 py-1 rounded-full mb-5">
+                <Smartphone className="w-4 h-4" /> Em breve nas lojas
+              </div>
+              <h3 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">App Android &amp; iOS</h3>
+              <p className="text-gray-600 leading-relaxed mb-6 text-lg">
+                Na palma da mão, em sala de aula. Faça a chamada, registre o diário e acompanhe entregas sem precisar de papel ou internet estável. Leve e rápido.
+              </p>
+              <div className="flex items-center gap-3 text-gray-500 text-sm font-medium">
+                <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                Android disponível · iOS em breve
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ───────── PLANOS DE ASSINATURA ───────── */}
+      <section className="py-24 bg-[#1E1B4B]">
+        <div className="container mx-auto px-4 md:px-6">
+          <motion.div
+            initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }}
+            variants={stagger} className="text-center mb-16"
+          >
+            <motion.p variants={fadeUp} className="text-[#FBBF24] font-semibold text-sm uppercase tracking-widest mb-3">
+              Planos
+            </motion.p>
+            <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-bold text-white">
+              Escolha o plano ideal para você
+            </motion.h2>
+            <motion.p variants={fadeUp} className="text-white/60 text-lg mt-4 max-w-xl mx-auto">
+              Mensalidade simples, sem fidelidade. Cancele quando quiser.
+            </motion.p>
+          </motion.div>
+
+          <motion.div
+            initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }}
+            variants={stagger}
+            className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto items-start"
+          >
+            {/* Plano Libâneo */}
+            <motion.div
+              variants={fadeUp}
+              className="bg-white/5 border border-white/15 rounded-3xl p-8 flex flex-col"
+            >
+              <div className="mb-6">
+                <p className="text-[#a78bfa] text-sm font-bold uppercase tracking-widest mb-2">Básico</p>
+                <h3 className="text-2xl font-black text-white mb-1">Libâneo</h3>
+                <div className="flex items-end gap-1 mt-4">
+                  <span className="text-4xl font-extrabold text-white">R$&nbsp;20</span>
+                  <span className="text-white/50 mb-1">/mês</span>
+                </div>
+              </div>
+              <ul className="space-y-3 mb-8 flex-1">
+                {[
+                  "Chamada de presença",
+                  "Criação de atividades",
+                  "Planejamento semanal e diário",
+                  "Relatório específico por aluno",
+                  "Relatório geral da turma",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3 text-white/75 text-sm">
+                    <Check className="w-4 h-4 text-[#a78bfa] shrink-0 mt-0.5" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <a href="/web/" data-testid="link-plan-libaneo">
+                <Button className="w-full bg-white/10 hover:bg-white/20 text-white font-bold border border-white/20">
+                  Começar agora
                 </Button>
               </a>
             </motion.div>
 
-            {/* App Android */}
+            {/* Plano Saviani — destaque */}
             <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="bg-[#1E1B4B] rounded-3xl shadow-xl p-8 flex flex-col items-start"
+              variants={fadeUp}
+              className="relative bg-[#7C3AED] rounded-3xl p-8 flex flex-col shadow-2xl shadow-purple-900/50 ring-2 ring-[#FBBF24]"
             >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
-                  <Smartphone className="w-6 h-6 text-[#FBBF24]" />
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                <span className="bg-[#FBBF24] text-[#1E1B4B] text-xs font-black px-4 py-1.5 rounded-full uppercase tracking-wide">
+                  Mais popular
+                </span>
+              </div>
+              <div className="mb-6">
+                <p className="text-yellow-200 text-sm font-bold uppercase tracking-widest mb-2">Médio</p>
+                <h3 className="text-2xl font-black text-white mb-1">Saviani</h3>
+                <div className="flex items-end gap-1 mt-4">
+                  <span className="text-4xl font-extrabold text-white">R$&nbsp;60</span>
+                  <span className="text-white/60 mb-1">/mês</span>
                 </div>
-                <div>
-                  <span className="inline-block bg-[#FBBF24]/20 text-[#FBBF24] text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-wide mb-1">
-                    Em breve na App Store
-                  </span>
-                  <h3 className="text-xl font-bold text-white">App Android</h3>
-                </div>
               </div>
-              <p className="text-white/70 leading-relaxed mb-6">
-                Na palma da mão, em sala de aula. Faça a chamada, registre o diário e acompanhe entregas sem precisar de papel ou internet estável. Leve e rápido.
-              </p>
-              <div className="flex justify-center w-full">
-                <PhoneFrame
-                  src="/screenshots/menu.jpeg"
-                  alt="App PedagoDIA"
-                />
-              </div>
-              <div className="mt-6 w-full flex items-center justify-center gap-2 text-white/50 text-sm">
-                <Smartphone className="w-4 h-4" />
-                Android disponível · iOS em breve
-              </div>
+              <ul className="space-y-3 mb-8 flex-1">
+                {[
+                  "Tudo do plano Libâneo",
+                  "Relatório para os pais",
+                  "Compartilhamento individual por aluno",
+                  "Link único por responsável",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3 text-white/90 text-sm">
+                    <Check className="w-4 h-4 text-[#FBBF24] shrink-0 mt-0.5" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <a href="/web/" data-testid="link-plan-saviani">
+                <Button className="w-full bg-[#FBBF24] hover:bg-[#f59e0b] text-[#1E1B4B] font-bold border-0">
+                  Escolher Saviani
+                </Button>
+              </a>
             </motion.div>
-          </div>
+
+            {/* Plano Freire */}
+            <motion.div
+              variants={fadeUp}
+              className="bg-white/5 border border-white/15 rounded-3xl p-8 flex flex-col"
+            >
+              <div className="mb-6">
+                <p className="text-[#fb923c] text-sm font-bold uppercase tracking-widest mb-2">Completo</p>
+                <h3 className="text-2xl font-black text-white mb-1">Freire</h3>
+                <div className="flex items-end gap-1 mt-4">
+                  <span className="text-4xl font-extrabold text-white">R$&nbsp;100</span>
+                  <span className="text-white/50 mb-1">/mês</span>
+                </div>
+              </div>
+              <ul className="space-y-3 mb-8 flex-1">
+                {[
+                  "Tudo do plano Saviani",
+                  "Planejamento semanal com IA",
+                  "Planejamento diário com IA",
+                  "Sugestões personalizadas por turma",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3 text-white/75 text-sm">
+                    <Check className="w-4 h-4 text-[#fb923c] shrink-0 mt-0.5" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <a href="/web/" data-testid="link-plan-freire">
+                <Button className="w-full bg-white/10 hover:bg-white/20 text-white font-bold border border-white/20">
+                  Escolher Freire
+                </Button>
+              </a>
+            </motion.div>
+          </motion.div>
         </div>
       </section>
 
@@ -363,11 +492,8 @@ export default function Home() {
       <section className="py-24 bg-[#7C3AED]/10">
         <div className="container mx-auto px-4 md:px-6">
           <motion.div
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-80px" }}
-            variants={stagger}
-            className="text-center mb-16"
+            initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }}
+            variants={stagger} className="text-center mb-16"
           >
             <motion.p variants={fadeUp} className="text-[#7C3AED] font-semibold text-sm uppercase tracking-widest mb-3">
               Diferenciais
@@ -378,38 +504,28 @@ export default function Home() {
           </motion.div>
 
           <motion.div
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-60px" }}
-            variants={stagger}
-            className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto"
+            initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }}
+            variants={stagger} className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto"
           >
             {[
               {
-                icon: <Zap className="w-7 h-7" />,
-                color: "#7C3AED",
-                bg: "#7C3AED",
+                icon: <Zap className="w-7 h-7" />, bg: "#7C3AED",
                 title: "Simplicidade Extrema",
                 desc: "Interface criada para professores, não para engenheiros. Cada funcionalidade está a no máximo 2 toques de distância. Sem curva de aprendizado.",
               },
               {
-                icon: <Star className="w-7 h-7" />,
-                color: "#F97316",
-                bg: "#F97316",
+                icon: <Star className="w-7 h-7" />, bg: "#F97316",
                 title: "Auxílio na Rotina",
-                desc: "O PedagoDIA aprende com o seu padrão de uso. Com IA, sugere planejamentos de aula e alertas de frequência antes que você precise pedir.",
+                desc: "Com IA, o PedagoDIA sugere planejamentos de aula e alertas de frequência antes que você precise pedir.",
               },
               {
-                icon: <Package className="w-7 h-7" />,
-                color: "#FBBF24",
-                bg: "#FBBF24",
+                icon: <Package className="w-7 h-7" />, bg: "#FBBF24",
                 title: "Tudo em um só lugar",
-                desc: "Chamada, diário, atividades, planejamento e relatórios num único app. Chega de planilhas no Google Drive, cadernos físicos e apps separados.",
+                desc: "Chamada, diário, atividades, planejamento e relatórios num único app. Chega de planilhas e apps separados.",
               },
             ].map((card) => (
               <motion.div
-                key={card.title}
-                variants={fadeUp}
+                key={card.title} variants={fadeUp}
                 className="bg-white rounded-2xl p-8 shadow-md hover:shadow-xl transition-shadow border border-gray-100"
               >
                 <div
@@ -430,9 +546,7 @@ export default function Home() {
       <section className="py-14 bg-white border-y border-gray-100">
         <div className="container mx-auto px-4 md:px-6">
           <motion.div
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true }}
+            initial="hidden" whileInView="show" viewport={{ once: true }}
             variants={stagger}
             className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16"
           >
@@ -442,8 +556,7 @@ export default function Home() {
               { icon: <Zap className="w-6 h-6 text-[#FBBF24]" />, label: "Só o que importa" },
             ].map((pill) => (
               <motion.div
-                key={pill.label}
-                variants={fadeUp}
+                key={pill.label} variants={fadeUp}
                 className="flex items-center gap-3 text-gray-700 font-semibold text-lg"
                 data-testid={`trust-pill-${pill.label.toLowerCase().replace(/\s+/g, "-")}`}
               >
@@ -461,24 +574,16 @@ export default function Home() {
       <section className="py-28 relative overflow-hidden">
         <div
           className="absolute inset-0 z-0"
-          style={{
-            background:
-              "linear-gradient(135deg, #1E1B4B 0%, #7C3AED 60%, #F97316 100%)",
-          }}
+          style={{ background: "linear-gradient(135deg, #1E1B4B 0%, #7C3AED 60%, #F97316 100%)" }}
         />
         <div className="container relative z-10 mx-auto px-4 md:px-6 text-center text-white">
-          <motion.div
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true }}
-            variants={stagger}
-          >
+          <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={stagger}>
             <motion.h2 variants={fadeUp} className="text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6 tracking-tight">
               Pronto para transformar <br className="hidden md:block" />
               a sua rotina escolar?
             </motion.h2>
             <motion.p variants={fadeUp} className="text-xl text-white/80 mb-10 max-w-2xl mx-auto">
-              Junte-se a milhares de educadores que já estão economizando horas todas as semanas com o PedagoDIA.
+              Junte-se aos educadores que já estão economizando horas todas as semanas com o PedagoDIA.
             </motion.p>
             <motion.div variants={fadeUp}>
               <a href="/web/" data-testid="link-final-cta">
@@ -500,9 +605,7 @@ export default function Home() {
           <div className="grid md:grid-cols-4 gap-12 mb-12">
             <div className="md:col-span-2">
               <Link href="/" className="flex items-center gap-2 mb-4" data-testid="link-footer-logo">
-                <div className="w-8 h-8 rounded-lg bg-[#7C3AED] flex items-center justify-center text-white font-bold text-xl">
-                  P
-                </div>
+                <img src="/logo.png" alt="PedagoDIA" className="w-9 h-9 rounded-xl" />
                 <span className="font-bold text-xl tracking-tight text-white">PedagoDIA</span>
               </Link>
               <p className="text-lg max-w-xs mb-6 text-white/60 leading-relaxed">
@@ -523,34 +626,18 @@ export default function Home() {
             <div>
               <h4 className="text-white font-bold mb-4 uppercase tracking-wider text-sm">Produto</h4>
               <ul className="space-y-3 text-sm">
-                <li>
-                  <a href="/web/" className="hover:text-white transition-colors" data-testid="link-footer-web">
-                    Plataforma Web
-                  </a>
-                </li>
-                <li>
-                  <span className="cursor-not-allowed opacity-40">App Android (Em breve)</span>
-                </li>
-                <li>
-                  <span className="cursor-not-allowed opacity-40">App iOS (Em breve)</span>
-                </li>
+                <li><a href="/web/" className="hover:text-white transition-colors" data-testid="link-footer-web">Plataforma Web</a></li>
+                <li><span className="cursor-not-allowed opacity-40">App Android (Em breve)</span></li>
+                <li><span className="cursor-not-allowed opacity-40">App iOS (Em breve)</span></li>
               </ul>
             </div>
 
             <div>
               <h4 className="text-white font-bold mb-4 uppercase tracking-wider text-sm">Contato</h4>
               <ul className="space-y-3 text-sm">
-                <li>
-                  <a href="mailto:contato@pedagodia.com.br" className="hover:text-white transition-colors">
-                    contato@pedagodia.com.br
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">Termos de Uso</a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition-colors">Política de Privacidade</a>
-                </li>
+                <li><a href="mailto:contato@pedagodia.com.br" className="hover:text-white transition-colors">contato@pedagodia.com.br</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Termos de Uso</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Política de Privacidade</a></li>
               </ul>
             </div>
           </div>
