@@ -3,7 +3,7 @@ import { Navbar } from "@/components/Navbar";
 import { PhoneFrame } from "@/components/PhoneFrame";
 import { LaptopFrame } from "@/components/LaptopFrame";
 import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import {
   Clock,
   BookOpen,
@@ -16,12 +16,12 @@ import {
   Package,
 } from "lucide-react";
 
-const fadeUp = {
+const fadeUp: Variants = {
   hidden: { opacity: 0, y: 32 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: "easeOut" } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.25, 0.1, 0.25, 1] } },
 };
 
-const stagger = {
+const stagger: Variants = {
   hidden: {},
   show: { transition: { staggerChildren: 0.12 } },
 };
