@@ -14,7 +14,7 @@ export function LaptopFrame({ src, alt, className, ...props }: LaptopFrameProps)
           <img
             src={src}
             alt={alt}
-            className="w-full h-full object-cover object-top"
+            className="w-full h-full object-contain bg-white"
           />
         </div>
       </div>
