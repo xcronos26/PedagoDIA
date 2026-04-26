@@ -324,7 +324,7 @@ export default function Home() {
                 Acesse pelo navegador, em qualquer computador ou tablet. Relatórios de desempenho, gestão de turmas, diário de classe e planejamento com visão completa da sua escola.
               </p>
               <a href="/web/" data-testid="link-acessar-web">
-                <Button className="bg-[#7C3AED] hover:bg-[#6d28d9] text-white font-bold px-8">
+                <Button className="bg-[#FBBF24] hover:bg-[#f59e0b] text-[#1E1B4B] font-bold px-8 border-0 shadow-lg">
                   Acessar a plataforma →
                 </Button>
               </a>
@@ -395,11 +395,11 @@ export default function Home() {
               </div>
               <ul className="space-y-3 mb-8 flex-1">
                 {[
-                  "Chamada de presença",
+                  "Chamada",
                   "Criação de atividades",
-                  "Planejamento semanal e diário",
-                  "Relatório específico por aluno",
-                  "Relatório geral da turma",
+                  "Planejamento semanal",
+                  "Relatório por aluno",
+                  "Gerenciamento de turmas e alunos",
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3 text-white/75 text-sm">
                     <Check className="w-4 h-4 text-[#a78bfa] shrink-0 mt-0.5" />
@@ -605,7 +605,7 @@ export default function Home() {
           <div className="grid md:grid-cols-4 gap-12 mb-12">
             <div className="md:col-span-2">
               <Link href="/" className="flex items-center gap-2 mb-4" data-testid="link-footer-logo">
-                <img src="/logo.png" alt="PedagoDIA" className="w-9 h-9 rounded-xl" />
+                <img src="/logo.png" alt="PedagoDIA" className="w-10 h-10 rounded-xl object-cover" />
                 <span className="font-bold text-xl tracking-tight text-white">PedagoDIA</span>
               </Link>
               <p className="text-lg max-w-xs mb-6 text-white/60 leading-relaxed">
