@@ -3,11 +3,12 @@
  * Providers are tried in order — first success wins.
  * Add a new provider by appending to the PROVIDERS array.
  *
- * Current order: Claude (Anthropic) → Gemini (Google)
+ * Current order: Claude (Anthropic) → Gemini (Google) → GPT (OpenAI)
  */
 
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 
 export interface AIResult {
   text: string;
@@ -47,14 +48,31 @@ async function callGemini(prompt: string): Promise<AIResult> {
   return { text: result.response.text(), provider: "gemini" };
 }
 
+// ── OpenAI (GPT) ──────────────────────────────────────────────────────────────
+async function callOpenAI(prompt: string): Promise<AIResult> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY não configurada");
+
+  const client = new OpenAI({ apiKey });
+  const completion = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    max_tokens: 8192,
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  const text = completion.choices[0]?.message?.content;
+  if (!text) throw new Error("OpenAI retornou resposta vazia");
+
+  return { text, provider: "openai" };
+}
+
 // ── Provider list — edit this to add/reorder providers ───────────────────────
 type ProviderFn = (prompt: string) => Promise<AIResult>;
 
 const PROVIDERS: Array<{ name: string; fn: ProviderFn }> = [
   { name: "claude", fn: callClaude },
   { name: "gemini", fn: callGemini },
-  // Para adicionar OpenAI/Codex no futuro:
-  // { name: "openai", fn: callOpenAI },
+  { name: "openai", fn: callOpenAI },
 ];
 
 // ── Public interface ──────────────────────────────────────────────────────────
