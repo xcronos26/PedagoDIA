@@ -21,8 +21,20 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/colors';
 import { useApp, Activity } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
+import { apiFetch } from '@/utils/api';
 import { ClassPicker, NO_CLASS_FILTER } from '@/components/ClassPicker';
 import { getBrasiliaToday, parseISODate, toISO, formatBR } from '@/utils/date';
+
+const AI_PURPLE = '#7C3AED';
+const AI_PURPLE_LIGHT = '#EDE9FE';
+
+type GeneratedActivity = {
+  titulo: string;
+  descricao: string;
+  tipo: 'classwork' | 'homework';
+  bncc: { codigo: string; descricao: string } | null;
+};
 
 type ActivityAction = { activity: Activity; mode: 'options' | 'edit' } | null;
 
@@ -103,6 +115,7 @@ const emptyForm = {
 
 export default function ActivitiesScreen() {
   const insets = useSafeAreaInsets();
+  const { token } = useAuth();
   const {
     activities, students, classes, selectedClassId, setSelectedClassId,
     subjects, addActivity, updateActivity, removeActivity,
@@ -114,6 +127,13 @@ export default function ActivitiesScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+
+  const [aiActModal, setAiActModal] = useState(false);
+  const [aiActSerie, setAiActSerie] = useState('');
+  const [aiActDisciplina, setAiActDisciplina] = useState('');
+  const [aiActTema, setAiActTema] = useState('');
+  const [aiActLoading, setAiActLoading] = useState(false);
+  const [aiActResult, setAiActResult] = useState<GeneratedActivity | null>(null);
 
   const [deliveryClassId, setDeliveryClassId] = useState<string | null>(null);
 
@@ -168,6 +188,54 @@ export default function ActivitiesScreen() {
     } finally {
       setAddingSaving(false);
     }
+  };
+
+  const handleGenerateActivity = async () => {
+    if (!aiActDisciplina.trim() || !aiActTema.trim() || !token) {
+      Alert.alert('Atenção', 'Informe a disciplina e o tema da atividade.');
+      return;
+    }
+    setAiActLoading(true);
+    try {
+      const result = await apiFetch<GeneratedActivity>('/ai/generate-activity', {
+        method: 'POST',
+        token,
+        body: JSON.stringify({
+          serie: aiActSerie.trim() || undefined,
+          disciplina: aiActDisciplina.trim(),
+          tema: aiActTema.trim(),
+        }),
+      });
+      setAiActResult(result);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err: unknown) {
+      const apiErr = err as { status?: number };
+      if (apiErr?.status === 429 || apiErr?.status === 503) {
+        Alert.alert('IA indisponível', 'A IA está com alta demanda agora. Aguarde um momento e tente novamente.');
+      } else {
+        Alert.alert('Erro', 'Não foi possível gerar a atividade. Tente novamente.');
+      }
+    } finally {
+      setAiActLoading(false);
+    }
+  };
+
+  const applyGeneratedActivity = () => {
+    if (!aiActResult) return;
+    const desc = [
+      aiActResult.titulo ? `${aiActResult.titulo}\n` : '',
+      aiActResult.descricao,
+      aiActResult.bncc ? `\nBNCC: ${aiActResult.bncc.codigo} – ${aiActResult.bncc.descricao}` : '',
+    ].filter(Boolean).join('');
+    setForm(f => ({
+      ...f,
+      subject: aiActDisciplina || f.subject,
+      type: aiActResult!.tipo,
+      description: desc,
+    }));
+    setAiActModal(false);
+    setAiActResult(null);
+    setShowAddModal(true);
   };
 
   const handleSaveEdit = async () => {
@@ -252,9 +320,18 @@ export default function ActivitiesScreen() {
     <View style={[styles.container, { paddingTop: topPadding }]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Atividades</Text>
-        <TouchableOpacity style={styles.addButton} onPress={() => setShowAddModal(true)} activeOpacity={0.8}>
-          <Ionicons name="add" size={24} color="#fff" />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+          <TouchableOpacity
+            style={styles.aiButton}
+            onPress={() => { setAiActResult(null); setAiActModal(true); }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="sparkles" size={18} color={AI_PURPLE} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.addButton} onPress={() => setShowAddModal(true)} activeOpacity={0.8}>
+            <Ionicons name="add" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.subjectFilter} contentContainerStyle={styles.subjectFilterContent}>
@@ -743,6 +820,127 @@ export default function ActivitiesScreen() {
           </View>
         </Modal>
       ) : null}
+
+      {/* AI Activity Generation Modal */}
+      <Modal visible={aiActModal} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.38)' }}>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => !aiActLoading && setAiActModal(false)} />
+          <KeyboardAvoidingView behavior={kavBehavior} style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
+            <View style={[styles.modalCard, { paddingBottom: insets.bottom + 16 }]}>
+              <View style={styles.modalHandle} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: AI_PURPLE_LIGHT, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="sparkles" size={18} color={AI_PURPLE} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 17, color: Colors.text }}>Gerar atividade com IA</Text>
+                  <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.textSecondary, marginTop: 1 }}>Crie atividades alinhadas à BNCC</Text>
+                </View>
+              </View>
+
+              <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                {aiActResult ? (
+                  <View style={{ backgroundColor: AI_PURPLE_LIGHT, borderRadius: 14, padding: 14, gap: 8, borderWidth: 1, borderColor: AI_PURPLE + '25', marginBottom: 4 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={[styles.typeBadge, { backgroundColor: aiActResult.tipo === 'homework' ? Colors.homeworkLight : Colors.classworkLight }]}>
+                        <Text style={[styles.typeText, { color: aiActResult.tipo === 'homework' ? Colors.homework : Colors.classwork }]}>
+                          {aiActResult.tipo === 'homework' ? 'Para casa' : 'Em sala'}
+                        </Text>
+                      </View>
+                    </View>
+                    {aiActResult.titulo ? (
+                      <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 15, color: Colors.text }}>{aiActResult.titulo}</Text>
+                    ) : null}
+                    {aiActResult.descricao ? (
+                      <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.text, lineHeight: 19 }}>{aiActResult.descricao}</Text>
+                    ) : null}
+                    {aiActResult.bncc ? (
+                      <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.text, lineHeight: 19, marginTop: 2 }}>
+                        <Text style={{ fontFamily: 'Inter_600SemiBold' }}>BNCC: </Text>
+                        {aiActResult.bncc.codigo} – {aiActResult.bncc.descricao}
+                      </Text>
+                    ) : null}
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                      <TouchableOpacity
+                        style={[styles.modalCancelBtn, { marginTop: 0 }]}
+                        onPress={() => setAiActResult(null)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.modalCancelText}>Refazer</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 14, backgroundColor: AI_PURPLE }}
+                        onPress={applyGeneratedActivity}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                        <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15, color: '#fff' }}>Usar atividade</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <Text style={styles.fieldLabel}>Disciplina</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="ex: Matemática, Português, Ciências..."
+                      placeholderTextColor={Colors.textTertiary}
+                      value={aiActDisciplina}
+                      onChangeText={setAiActDisciplina}
+                    />
+
+                    <Text style={styles.fieldLabel}>Tema da atividade</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="ex: Adição, Leitura, Fotossíntese..."
+                      placeholderTextColor={Colors.textTertiary}
+                      value={aiActTema}
+                      onChangeText={setAiActTema}
+                    />
+
+                    <Text style={styles.fieldLabel}>
+                      Série / Ano{' '}
+                      <Text style={{ color: Colors.textTertiary, fontFamily: 'Inter_400Regular' }}>(opcional)</Text>
+                    </Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="ex: 3º ano, 5º ano..."
+                      placeholderTextColor={Colors.textTertiary}
+                      value={aiActSerie}
+                      onChangeText={setAiActSerie}
+                    />
+
+                    <View style={styles.modalButtons}>
+                      <TouchableOpacity
+                        style={styles.modalCancelBtn}
+                        onPress={() => setAiActModal(false)}
+                        disabled={aiActLoading}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.modalCancelText}>Cancelar</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 14, backgroundColor: AI_PURPLE },
+                          aiActLoading && { opacity: 0.7 },
+                        ]}
+                        onPress={handleGenerateActivity}
+                        disabled={aiActLoading}
+                        activeOpacity={0.85}
+                      >
+                        {aiActLoading
+                          ? <><ActivityIndicator size="small" color="#fff" /><Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15, color: '#fff' }}>Gerando...</Text></>
+                          : <><Ionicons name="sparkles" size={15} color="#fff" /><Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15, color: '#fff' }}>Gerar atividade</Text></>
+                        }
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -761,6 +959,11 @@ const styles = StyleSheet.create({
     width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+  },
+  aiButton: {
+    width: 44, height: 44, borderRadius: 22, backgroundColor: AI_PURPLE_LIGHT,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: AI_PURPLE + '40',
   },
   subjectFilter: { maxHeight: 44, marginBottom: 8 },
   subjectFilterContent: { paddingHorizontal: 16, gap: 8, alignItems: 'center' },
