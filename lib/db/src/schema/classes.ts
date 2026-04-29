@@ -6,6 +6,7 @@ export const classesTable = pgTable("classes", {
   id: text("id").primaryKey(),
   teacherId: text("teacher_id").notNull(),
   name: text("name").notNull(),
+  color: text("color"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

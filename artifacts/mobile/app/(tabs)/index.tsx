@@ -33,12 +33,13 @@ function formatDateDisplay(dateStr: string) {
 
 type StudentAction = { student: Student; mode: 'options' | 'edit' | 'moveClass' } | null;
 
-function StudentCard({ student, isAbsent, onToggle, onLongPress, className }: {
+function StudentCard({ student, isAbsent, onToggle, onLongPress, className, classColor }: {
   student: Student;
   isAbsent: boolean;
   onToggle: () => void;
   onLongPress: () => void;
   className?: string | null;
+  classColor?: string | null;
 }) {
   const scale = useSharedValue(1);
 
@@ -76,8 +77,8 @@ function StudentCard({ student, isAbsent, onToggle, onLongPress, className }: {
             {student.name}
           </Text>
           {className ? (
-            <View style={styles.classBadge}>
-              <Text style={styles.classBadgeText} numberOfLines={1}>{className}</Text>
+            <View style={[styles.classBadge, classColor ? { backgroundColor: classColor + '25' } : undefined]}>
+              <Text style={[styles.classBadgeText, classColor ? { color: classColor } : undefined]} numberOfLines={1}>{className}</Text>
             </View>
           ) : null}
         </View>
@@ -259,6 +260,7 @@ export default function AttendanceScreen() {
               onToggle={() => toggleAttendance(item.id, selectedDate)}
               onLongPress={() => openOptions(item)}
               className={!selectedClassId ? classes.find(c => c.id === item.classId)?.name ?? null : null}
+              classColor={!selectedClassId ? classes.find(c => c.id === item.classId)?.color ?? null : null}
             />
           )}
           contentContainerStyle={[styles.list, { paddingBottom: bottomPadding + 100 }]}

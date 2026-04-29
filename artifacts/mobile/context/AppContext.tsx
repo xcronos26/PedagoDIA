@@ -16,6 +16,7 @@ export type Student = {
 export type Turma = {
   id: string;
   name: string;
+  color: string;
   studentCount: number;
   createdAt: string;
 };
@@ -87,7 +88,7 @@ type ApiActivity = { id: string; subject: string; type: string; link?: string; d
 type ApiAttendance = { id: string; studentId: string; date: string; present: boolean; justified?: boolean; justification?: string };
 type ApiDelivery = { id: string; activityId: string; studentId: string; delivered: boolean; seen: boolean; deliveredAt?: string; seenAt?: string };
 type ApiSubject = { id: string; name: string };
-type ApiTurma = { id: string; name: string; studentCount: number; createdAt: string };
+type ApiTurma = { id: string; name: string; color?: string; studentCount: number; createdAt: string };
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const { token, logout } = useAuth();
@@ -166,7 +167,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })));
 
       setSubjects(subjectsData.map(s => s.name).sort((a, b) => a.localeCompare(b, 'pt-BR')));
-      setClasses(classesData);
+      setClasses(classesData.map(c => ({ ...c, color: c.color ?? '#4F7BF7' })));
     } catch (e) {
       const was401 = await handle401(e);
       if (!was401) {
@@ -443,7 +444,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ name: trimmed }),
         token,
       });
-      setClasses(prev => [...prev, turma].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')));
+      setClasses(prev => [...prev, { ...turma, color: turma.color ?? '#4F7BF7' }].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')));
     });
   }, [token, withErrorHandling]);
 
@@ -458,7 +459,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
       setClasses(prev =>
         prev
-          .map(c => c.id === id ? { ...c, name: turma.name } : c)
+          .map(c => c.id === id ? { ...c, name: turma.name, color: turma.color ?? c.color } : c)
           .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
       );
     });

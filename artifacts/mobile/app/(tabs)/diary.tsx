@@ -236,9 +236,11 @@ export default function DiaryScreen() {
               contentContainerStyle={{ paddingBottom: bottomPadding + 100 }}
             >
               {filteredStudents.map((student, index) => {
-                const studentClassName = !selectedClassId
-                  ? classes.find(c => c.id === student.classId)?.name ?? null
+                const studentClass = !selectedClassId
+                  ? classes.find(c => c.id === student.classId) ?? null
                   : null;
+                const studentClassName = studentClass?.name ?? null;
+                const studentClassColor = studentClass?.color ?? null;
                 return (
                 <View
                   key={student.id}
@@ -247,8 +249,8 @@ export default function DiaryScreen() {
                   <View style={styles.nameColumn}>
                     <Text style={styles.studentName} numberOfLines={1}>{student.name}</Text>
                     {studentClassName ? (
-                      <View style={styles.classBadge}>
-                        <Text style={styles.classBadgeText} numberOfLines={1}>{studentClassName}</Text>
+                      <View style={[styles.classBadge, studentClassColor ? { backgroundColor: studentClassColor + '25' } : undefined]}>
+                        <Text style={[styles.classBadgeText, studentClassColor ? { color: studentClassColor } : undefined]} numberOfLines={1}>{studentClassName}</Text>
                       </View>
                     ) : null}
                   </View>

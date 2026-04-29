@@ -23,7 +23,7 @@ export function ClassPicker({ classes, selectedClassId, onSelect, showAll = true
       >
         {showAll && (
           <TouchableOpacity
-            style={[styles.chip, !selectedClassId && styles.chipActive]}
+            style={[styles.chip, !selectedClassId && styles.chipAllActive]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               onSelect(null);
@@ -35,21 +35,29 @@ export function ClassPicker({ classes, selectedClassId, onSelect, showAll = true
             </Text>
           </TouchableOpacity>
         )}
-        {classes.map(turma => (
-          <TouchableOpacity
-            key={turma.id}
-            style={[styles.chip, selectedClassId === turma.id && styles.chipActive]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              onSelect(selectedClassId === turma.id ? null : turma.id);
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.chipText, selectedClassId === turma.id && styles.chipTextActive]}>
-              {turma.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {classes.map(turma => {
+          const isActive = selectedClassId === turma.id;
+          return (
+            <TouchableOpacity
+              key={turma.id}
+              style={[
+                styles.chip,
+                isActive
+                  ? { backgroundColor: turma.color, borderColor: turma.color }
+                  : { borderColor: turma.color + '60' },
+              ]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onSelect(isActive ? null : turma.id);
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
+                {turma.name}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -75,7 +83,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: Colors.border,
   },
-  chipActive: {
+  chipAllActive: {
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
   },

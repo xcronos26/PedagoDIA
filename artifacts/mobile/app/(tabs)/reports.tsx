@@ -36,7 +36,7 @@ function getLast30Days() {
   return days;
 }
 
-function StudentReportCard({ student, onPress, className }: { student: Student; onPress: () => void; className?: string | null }) {
+function StudentReportCard({ student, onPress, className, classColor }: { student: Student; onPress: () => void; className?: string | null; classColor?: string | null }) {
   const { activities, getDeliveriesForStudent } = useApp();
   const deliveries = getDeliveriesForStudent(student.id);
   const deliveredCount = deliveries.filter(d => d.delivered).length;
@@ -53,8 +53,8 @@ function StudentReportCard({ student, onPress, className }: { student: Student; 
         <View style={styles.studentNameRow}>
           <Text style={styles.studentName}>{student.name}</Text>
           {className ? (
-            <View style={styles.classBadge}>
-              <Text style={styles.classBadgeText} numberOfLines={1}>{className}</Text>
+            <View style={[styles.classBadge, classColor ? { backgroundColor: classColor + '25' } : undefined]}>
+              <Text style={[styles.classBadgeText, classColor ? { color: classColor } : undefined]} numberOfLines={1}>{className}</Text>
             </View>
           ) : null}
         </View>
@@ -859,6 +859,7 @@ export default function ReportsScreen() {
               student={item}
               onPress={() => setSelectedStudent(item)}
               className={!selectedClassId ? classes.find(c => c.id === item.classId)?.name ?? null : null}
+              classColor={!selectedClassId ? classes.find(c => c.id === item.classId)?.color ?? null : null}
             />
           )}
           contentContainerStyle={[styles.list, { paddingBottom: bottomPadding + 100 }]}

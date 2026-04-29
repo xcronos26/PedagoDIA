@@ -1,9 +1,22 @@
 import { Router, type IRouter } from "express";
 import { db, classesTable, studentsTable } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, count } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
 
 const router: IRouter = Router();
+
+const CLASS_COLORS = [
+  '#4F7BF7',
+  '#F7634F',
+  '#4FBF87',
+  '#F7B74F',
+  '#9B4FF7',
+  '#F74FAA',
+  '#4FBFBF',
+  '#F78C4F',
+  '#7C4FF7',
+  '#4FAF5A',
+];
 
 function generateId() {
   return Date.now().toString() + Math.random().toString(36).substring(2, 9);
@@ -15,19 +28,41 @@ router.get("/classes", requireAuth, async (req, res) => {
       .select({
         id: classesTable.id,
         name: classesTable.name,
+        color: classesTable.color,
         createdAt: classesTable.createdAt,
         studentCount: sql<number>`cast(count(${studentsTable.id}) as int)`,
       })
       .from(classesTable)
       .leftJoin(studentsTable, eq(studentsTable.classId, classesTable.id))
       .where(eq(classesTable.teacherId, req.teacherId!))
-      .groupBy(classesTable.id, classesTable.name, classesTable.createdAt)
+      .groupBy(classesTable.id, classesTable.name, classesTable.color, classesTable.createdAt)
       .orderBy(classesTable.name);
+
+    const uncolored = classes.filter((c) => !c.color);
+    if (uncolored.length > 0) {
+      const usedColors = new Set(classes.filter((c) => c.color).map((c) => c.color as string));
+      let paletteIndex = 0;
+      const updates = uncolored.map((c) => {
+        while (usedColors.has(CLASS_COLORS[paletteIndex % CLASS_COLORS.length]) && paletteIndex < CLASS_COLORS.length) {
+          paletteIndex++;
+        }
+        const color = CLASS_COLORS[paletteIndex % CLASS_COLORS.length];
+        usedColors.add(color);
+        paletteIndex++;
+        c.color = color;
+        return db
+          .update(classesTable)
+          .set({ color })
+          .where(and(eq(classesTable.id, c.id), eq(classesTable.teacherId, req.teacherId!)));
+      });
+      await Promise.all(updates);
+    }
 
     res.json(
       classes.map((c) => ({
         id: c.id,
         name: c.name,
+        color: c.color!,
         studentCount: c.studentCount ?? 0,
         createdAt: c.createdAt.toISOString(),
       }))
@@ -45,17 +80,27 @@ router.post("/classes", requireAuth, async (req, res) => {
       res.status(400).json({ error: "Nome da turma é obrigatório" });
       return;
     }
+
+    const [{ total }] = await db
+      .select({ total: count() })
+      .from(classesTable)
+      .where(eq(classesTable.teacherId, req.teacherId!));
+
+    const color = CLASS_COLORS[Number(total) % CLASS_COLORS.length];
+
     const [created] = await db
       .insert(classesTable)
       .values({
         id: generateId(),
         teacherId: req.teacherId!,
         name: name.trim(),
+        color,
       })
       .returning();
     res.status(201).json({
       id: created.id,
       name: created.name,
+      color: created.color ?? color,
       studentCount: 0,
       createdAt: created.createdAt.toISOString(),
     });
@@ -85,6 +130,7 @@ router.put("/classes/:id", requireAuth, async (req, res) => {
     res.json({
       id: updated.id,
       name: updated.name,
+      color: updated.color ?? CLASS_COLORS[0],
       createdAt: updated.createdAt.toISOString(),
     });
   } catch (err) {
