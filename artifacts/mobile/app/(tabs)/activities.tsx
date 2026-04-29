@@ -191,7 +191,11 @@ export default function ActivitiesScreen() {
   };
 
   const handleGenerateActivity = async () => {
-    if (!aiActDisciplina.trim() || !aiActTema.trim() || !token) {
+    if (!token) {
+      Alert.alert('Sessão expirada', 'Faça login novamente para usar a IA.');
+      return;
+    }
+    if (!aiActDisciplina.trim() || !aiActTema.trim()) {
       Alert.alert('Atenção', 'Informe a disciplina e o tema da atividade.');
       return;
     }
