@@ -21,7 +21,7 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/colors';
 import { useApp, Activity } from '@/context/AppContext';
-import { ClassPicker } from '@/components/ClassPicker';
+import { ClassPicker, NO_CLASS_FILTER } from '@/components/ClassPicker';
 import { getBrasiliaToday, parseISODate, toISO, formatBR } from '@/utils/date';
 
 type ActivityAction = { activity: Activity; mode: 'options' | 'edit' } | null;
@@ -119,12 +119,13 @@ export default function ActivitiesScreen() {
 
   React.useEffect(() => {
     if (selectedActivity) {
-      setDeliveryClassId(selectedClassId);
+      setDeliveryClassId(selectedClassId === NO_CLASS_FILTER ? null : selectedClassId);
     }
   }, [selectedActivity]);
 
   const filteredDeliveryStudents = useMemo(() => {
     if (!deliveryClassId) return students;
+    if (deliveryClassId === NO_CLASS_FILTER) return students.filter(s => s.classId === null);
     return students.filter(s => s.classId === deliveryClassId);
   }, [students, deliveryClassId]);
   const [activityAction, setActivityAction] = useState<ActivityAction>(null);

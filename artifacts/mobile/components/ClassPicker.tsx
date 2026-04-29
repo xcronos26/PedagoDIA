@@ -4,15 +4,21 @@ import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/colors';
 import { Turma } from '@/context/AppContext';
 
+export const NO_CLASS_FILTER = '__no_class__';
+
 interface ClassPickerProps {
   classes: Turma[];
   selectedClassId: string | null;
   onSelect: (id: string | null) => void;
   showAll?: boolean;
+  showNoClass?: boolean;
 }
 
-export function ClassPicker({ classes, selectedClassId, onSelect, showAll = true }: ClassPickerProps) {
-  if (classes.length === 0) return null;
+export function ClassPicker({ classes, selectedClassId, onSelect, showAll = true, showNoClass = false }: ClassPickerProps) {
+  if (classes.length === 0 && !showNoClass) return null;
+
+  const isNoClassActive = selectedClassId === NO_CLASS_FILTER;
+  const isAllActive = !selectedClassId;
 
   return (
     <View style={styles.wrapper}>
@@ -23,15 +29,29 @@ export function ClassPicker({ classes, selectedClassId, onSelect, showAll = true
       >
         {showAll && (
           <TouchableOpacity
-            style={[styles.chip, !selectedClassId && styles.chipAllActive]}
+            style={[styles.chip, isAllActive && styles.chipAllActive]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               onSelect(null);
             }}
             activeOpacity={0.8}
           >
-            <Text style={[styles.chipText, !selectedClassId && styles.chipTextActive]}>
+            <Text style={[styles.chipText, isAllActive && styles.chipTextActive]}>
               Todas
+            </Text>
+          </TouchableOpacity>
+        )}
+        {showNoClass && (
+          <TouchableOpacity
+            style={[styles.chip, isNoClassActive && styles.chipAllActive]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onSelect(isNoClassActive ? null : NO_CLASS_FILTER);
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.chipText, isNoClassActive && styles.chipTextActive]}>
+              Sem turma
             </Text>
           </TouchableOpacity>
         )}

@@ -20,7 +20,7 @@ import { Colors } from '@/constants/colors';
 import { useApp, Student } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { DataLoadingWrapper } from '@/components/DataLoadingWrapper';
-import { ClassPicker } from '@/components/ClassPicker';
+import { ClassPicker, NO_CLASS_FILTER } from '@/components/ClassPicker';
 
 function formatDate(date: Date) {
   return date.toISOString().split('T')[0];
@@ -120,8 +120,11 @@ export default function AttendanceScreen() {
   const [editName, setEditName] = useState('');
   const [editClassId, setEditClassId] = useState<string | null>(null);
 
+  const hasUnclassifiedStudents = useMemo(() => students.some(s => s.classId === null), [students]);
+
   const filteredStudents = useMemo(() => {
     if (!selectedClassId) return students;
+    if (selectedClassId === NO_CLASS_FILTER) return students.filter(s => s.classId === null);
     return students.filter(s => s.classId === selectedClassId);
   }, [students, selectedClassId]);
 
@@ -139,7 +142,8 @@ export default function AttendanceScreen() {
   const handleAddStudent = async () => {
     if (!newStudentName.trim()) return;
     setAdding(true);
-    await addStudent(newStudentName, newStudentClassId ?? selectedClassId);
+    const effectiveClassId = selectedClassId === NO_CLASS_FILTER ? null : selectedClassId;
+    await addStudent(newStudentName, newStudentClassId ?? effectiveClassId);
     setNewStudentName('');
     setNewStudentClassId(null);
     setAdding(false);
@@ -217,6 +221,7 @@ export default function AttendanceScreen() {
         classes={classes}
         selectedClassId={selectedClassId}
         onSelect={setSelectedClassId}
+        showNoClass={hasUnclassifiedStudents || selectedClassId === NO_CLASS_FILTER}
       />
 
       <DataLoadingWrapper isLoaded={isLoaded} loadError={loadError} onRetry={loadData}>
@@ -239,10 +244,10 @@ export default function AttendanceScreen() {
             <Ionicons name="people-outline" size={48} color={Colors.textTertiary} />
           </View>
           <Text style={styles.emptyTitle}>
-            {selectedClassId ? 'Nenhum aluno nesta turma' : 'Nenhum aluno cadastrado'}
+            {selectedClassId === NO_CLASS_FILTER ? 'Nenhum aluno sem turma' : selectedClassId ? 'Nenhum aluno nesta turma' : 'Nenhum aluno cadastrado'}
           </Text>
           <Text style={styles.emptySubtitle}>
-            {selectedClassId ? 'Adicione alunos a esta turma' : 'Toque no + para adicionar alunos'}
+            {selectedClassId === NO_CLASS_FILTER ? 'Todos os alunos já têm turma' : selectedClassId ? 'Adicione alunos a esta turma' : 'Toque no + para adicionar alunos'}
           </Text>
           <TouchableOpacity style={styles.emptyButton} onPress={() => setShowAddModal(true)} activeOpacity={0.85}>
             <Ionicons name="add" size={20} color="#fff" />

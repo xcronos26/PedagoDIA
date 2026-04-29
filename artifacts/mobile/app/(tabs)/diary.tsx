@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/colors';
 import { useApp, AttendanceRecord } from '@/context/AppContext';
-import { ClassPicker } from '@/components/ClassPicker';
+import { ClassPicker, NO_CLASS_FILTER } from '@/components/ClassPicker';
 import {
   getWeekDays,
   getBrasiliaToday,
@@ -37,8 +37,11 @@ export default function DiaryScreen() {
   const insets = useSafeAreaInsets();
   const { students, classes, selectedClassId, setSelectedClassId, attendance, setAttendanceRecord, justifyAbsence, getAttendanceForDate, isLoaded, loadError, loadData } = useApp();
 
+  const hasUnclassifiedStudents = useMemo(() => students.some(s => s.classId === null), [students]);
+
   const filteredStudents = useMemo(() => {
     if (!selectedClassId) return students;
+    if (selectedClassId === NO_CLASS_FILTER) return students.filter(s => s.classId === null);
     return students.filter(s => s.classId === selectedClassId);
   }, [students, selectedClassId]);
 
@@ -189,6 +192,7 @@ export default function DiaryScreen() {
         classes={classes}
         selectedClassId={selectedClassId}
         onSelect={setSelectedClassId}
+        showNoClass={hasUnclassifiedStudents || selectedClassId === NO_CLASS_FILTER}
       />
 
       <DataLoadingWrapper isLoaded={isLoaded} loadError={loadError} onRetry={loadData}>
@@ -198,10 +202,10 @@ export default function DiaryScreen() {
             <Ionicons name="calendar-outline" size={48} color={Colors.textTertiary} />
           </View>
           <Text style={styles.emptyTitle}>
-            {selectedClassId ? 'Nenhum aluno nesta turma' : 'Nenhum aluno cadastrado'}
+            {selectedClassId === NO_CLASS_FILTER ? 'Nenhum aluno sem turma' : selectedClassId ? 'Nenhum aluno nesta turma' : 'Nenhum aluno cadastrado'}
           </Text>
           <Text style={styles.emptySubtitle}>
-            {selectedClassId ? 'Adicione alunos a esta turma' : 'Adicione alunos na aba Chamada'}
+            {selectedClassId === NO_CLASS_FILTER ? 'Todos os alunos já têm turma' : selectedClassId ? 'Adicione alunos a esta turma' : 'Adicione alunos na aba Chamada'}
           </Text>
         </View>
       ) : (
