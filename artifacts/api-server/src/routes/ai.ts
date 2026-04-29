@@ -1,29 +1,11 @@
 import { Router, type IRouter } from "express";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { requireAuth } from "../middlewares/auth";
+import { generateContent, getAiErrorStatus, getAiErrorMessage } from "../lib/ai-provider";
 import type { WeeklySchedule, DayEntry } from "@workspace/db";
 
 const router: IRouter = Router();
 
-function getGenAI() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY não configurada");
-  return new GoogleGenerativeAI(apiKey);
-}
-
-function getAiErrorStatus(err: unknown): number {
-  const e = err as { status?: number };
-  if (e?.status === 429) return 429;
-  if (e?.status === 503) return 503;
-  return 500;
-}
-
-function getAiErrorMessage(err: unknown, fallback: string): string {
-  const status = getAiErrorStatus(err);
-  if (status === 429) return "Limite de requisições da IA atingido. Tente novamente em alguns segundos.";
-  if (status === 503) return "A IA está com alta demanda. Tente novamente em breve.";
-  return fallback;
-}
+// ── Prompts ───────────────────────────────────────────────────────────────────
 
 const SUGGEST_PROMPT = (text: string, serie?: string) => `
 Você é um especialista em pedagogia brasileira e na BNCC (Base Nacional Comum Curricular).
@@ -200,6 +182,8 @@ Responda APENAS com JSON válido, sem markdown:
 }
 `.trim();
 
+// ── Routes ────────────────────────────────────────────────────────────────────
+
 router.post("/ai/suggest", requireAuth, async (req, res) => {
   try {
     const { text, serie } = req.body;
@@ -208,16 +192,10 @@ router.post("/ai/suggest", requireAuth, async (req, res) => {
       return;
     }
 
-    const genAI = getGenAI();
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: { responseMimeType: "application/json", maxOutputTokens: 8192 },
-    });
+    const { text: raw, provider } = await generateContent(SUGGEST_PROMPT(text.trim(), serie));
+    req.log.info({ provider }, "AI suggest completed");
 
-    const result = await model.generateContent(SUGGEST_PROMPT(text.trim(), serie));
-    const raw = result.response.text();
     const parsed = JSON.parse(raw);
-
     res.json({
       bncc: Array.isArray(parsed.bncc) ? parsed.bncc.slice(0, 3) : [],
       objetivos: Array.isArray(parsed.objetivos) ? parsed.objetivos.slice(0, 3) : [],
@@ -241,30 +219,19 @@ router.post("/ai/generate-plan", requireAuth, async (req, res) => {
       return;
     }
 
-    const genAI = getGenAI();
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: { responseMimeType: "application/json", maxOutputTokens: 8192 },
-    });
-
     let prompt: string;
     if (mode === "day") {
-      const disc = disciplina || "Geral";
-      const t = tema || "Aula do dia";
-      prompt = DAY_PROMPT(serie, disc, t);
+      prompt = DAY_PROMPT(serie, disciplina || "Geral", tema || "Aula do dia");
     } else {
-      if (tipo === "regente") {
-        prompt = WEEK_REGENTE_PROMPT(serie, tema || "", weeklySchedule ?? null);
-      } else {
-        const disc = disciplina || "Geral";
-        prompt = WEEK_DISCIPLINA_PROMPT(serie, disc, tema || "");
-      }
+      prompt = tipo === "regente"
+        ? WEEK_REGENTE_PROMPT(serie, tema || "", weeklySchedule ?? null)
+        : WEEK_DISCIPLINA_PROMPT(serie, disciplina || "Geral", tema || "");
     }
 
-    const result = await model.generateContent(prompt);
-    const raw = result.response.text();
-    const parsed = JSON.parse(raw);
+    const { text: raw, provider } = await generateContent(prompt);
+    req.log.info({ provider }, "AI generate-plan completed");
 
+    const parsed = JSON.parse(raw);
     res.json(parsed);
   } catch (err) {
     req.log.error({ err }, "Error in AI generate-plan");
@@ -280,16 +247,12 @@ router.post("/ai/generate-activity", requireAuth, async (req, res) => {
       return;
     }
 
-    const genAI = getGenAI();
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: { responseMimeType: "application/json", maxOutputTokens: 8192 },
-    });
+    const { text: raw, provider } = await generateContent(
+      ACTIVITY_PROMPT(serie || "Ensino Fundamental", disciplina, tema)
+    );
+    req.log.info({ provider }, "AI generate-activity completed");
 
-    const result = await model.generateContent(ACTIVITY_PROMPT(serie || "Ensino Fundamental", disciplina, tema));
-    const raw = result.response.text();
     const parsed = JSON.parse(raw);
-
     res.json({
       titulo: parsed.titulo ?? "",
       descricao: parsed.descricao ?? "",
