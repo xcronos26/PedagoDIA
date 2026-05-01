@@ -419,6 +419,14 @@ export default function Planejamento() {
   const isWeekPlan = aiPlanResult && "semana" in aiPlanResult;
 
   const [copiedPlan, setCopiedPlan] = useState(false);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!aiPlanModal) {
+      setCopiedPlan(false);
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    }
+  }, [aiPlanModal]);
 
   const buildPlanText = useCallback(() => {
     if (!aiPlanResult) return '';
@@ -468,7 +476,7 @@ export default function Planejamento() {
       await navigator.clipboard.writeText(text);
       setCopiedPlan(true);
       toast({ title: 'Copiado!', description: 'Planejamento copiado para a área de transferência.' });
-      setTimeout(() => setCopiedPlan(false), 2000);
+      copiedTimerRef.current = setTimeout(() => setCopiedPlan(false), 2000);
     } catch {
       toast({ title: 'Erro ao copiar', variant: 'destructive' });
     }
