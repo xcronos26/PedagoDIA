@@ -179,6 +179,8 @@ export default function PlanningScreen() {
   const [aiResult, setAiResult] = useState<WeekPlanResult | DayPlanResult | null>(null);
   const [aiResultModal, setAiResultModal] = useState(false);
   const [applyingAi, setApplyingAi] = useState(false);
+  const [aiHistory, setAiHistory] = useState<(WeekPlanResult | DayPlanResult)[]>([]);
+  const [aiHistoryIdx, setAiHistoryIdx] = useState(0);
 
   // AI activity state
   const [aiActModal, setAiActModal] = useState(false);
@@ -358,12 +360,20 @@ export default function PlanningScreen() {
 
   // ── AI PLAN ────────────────────────────────────────────────
   const openAiModal = (dateStr?: string) => {
-    setAiResult(null);
     if (dateStr) {
       const tema = getTemaValue(dateStr);
       if (tema) setAiTema(tema);
     }
-    setAiModal(true);
+    if (aiHistory.length > 0) {
+      // Show last generated result instead of empty form
+      const lastIdx = aiHistory.length - 1;
+      setAiHistoryIdx(lastIdx);
+      setAiResult(aiHistory[lastIdx]);
+      setAiResultModal(true);
+    } else {
+      setAiResult(null);
+      setAiModal(true);
+    }
   };
 
   const handleGeneratePlan = async () => {
@@ -405,6 +415,11 @@ export default function PlanningScreen() {
         result = raw as DayPlanResult;
       }
 
+      setAiHistory(prev => {
+        const updated = [...prev, result].slice(-3);
+        setAiHistoryIdx(updated.length - 1);
+        return updated;
+      });
       setAiResult(result);
       setAiModal(false);
       setAiResultModal(true);
@@ -959,6 +974,31 @@ export default function PlanningScreen() {
               </View>
             </View>
 
+            {/* Version history tabs */}
+            {aiHistory.length > 1 && (
+              <View style={ai.historyRow}>
+                <Text style={ai.historyLabel}>Versões:</Text>
+                {aiHistory.map((_, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[ai.versionTab, aiHistoryIdx === idx && ai.versionTabActive]}
+                    onPress={() => {
+                      const entry = aiHistory[idx];
+                      const isWeek = WEEK_KEYS.some(k => k in entry);
+                      setAiMode(isWeek ? 'week' : 'day');
+                      setAiHistoryIdx(idx);
+                      setAiResult(entry);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[ai.versionTabText, aiHistoryIdx === idx && ai.versionTabTextActive]}>
+                      V{idx + 1}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
             <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
               {aiMode === 'week' && weekResultEntries.map(({ key, label, plan }) => (
                 <View key={key} style={ai.resultCard}>
@@ -997,8 +1037,15 @@ export default function PlanningScreen() {
             </ScrollView>
 
             <View style={modal.btnRow}>
-              <TouchableOpacity style={modal.closeBtn} onPress={() => setAiResultModal(false)} disabled={applyingAi} activeOpacity={0.8}>
-                <Text style={modal.closeBtnText}>Descartar</Text>
+              <TouchableOpacity
+                style={modal.closeBtn}
+                onPress={() => { setAiResultModal(false); setAiModal(true); }}
+                disabled={applyingAi}
+                activeOpacity={0.8}
+              >
+                <Text style={modal.closeBtnText}>
+                  {aiHistory.length >= 3 ? '↺ Gerar nova' : '← Nova geração'}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[ai.generateBtn, applyingAi && { opacity: 0.7 }]}
@@ -1319,4 +1366,24 @@ const ai = StyleSheet.create({
   },
   actResultHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   actResultTitle: { fontFamily: 'Inter_700Bold', fontSize: 15, color: Colors.text },
+  historyRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginBottom: 12, flexWrap: 'wrap',
+  },
+  historyLabel: {
+    fontFamily: 'Inter_600SemiBold', fontSize: 12,
+    color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.6,
+  },
+  versionTab: {
+    paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8,
+    backgroundColor: Colors.surfaceSecondary,
+    borderWidth: 1.5, borderColor: Colors.border,
+  },
+  versionTabActive: {
+    backgroundColor: AI_PURPLE, borderColor: AI_PURPLE,
+  },
+  versionTabText: {
+    fontFamily: 'Inter_700Bold', fontSize: 12, color: Colors.text,
+  },
+  versionTabTextActive: { color: '#fff' },
 });
