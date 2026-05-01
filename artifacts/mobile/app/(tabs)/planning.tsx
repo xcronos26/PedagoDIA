@@ -482,7 +482,18 @@ export default function PlanningScreen() {
     if (!aiResult) return '';
     if (aiMode === 'day') {
       const p = aiResult as DayPlanResult;
-      return formatDayDescription(p);
+      const parts: string[] = [];
+      if (p.tema) parts.push(`Tema: ${p.tema}`);
+      if (p.objetivo) parts.push(`Objetivo: ${p.objetivo}`);
+      const bnccStr = p.bncc
+        ? `BNCC: ${p.bncc.codigo} – ${p.bncc.descricao}`
+        : p.habilidade_bncc ? `BNCC: ${p.habilidade_bncc}` : '';
+      if (bnccStr) parts.push(bnccStr);
+      const desc = p.descricao ?? p.descritivo ?? '';
+      if (desc) parts.push(desc);
+      const atv = p.atividade ?? p.atividade_sugerida ?? '';
+      if (atv) parts.push(`Atividade: ${atv}`);
+      return parts.join('\n\n');
     }
     const wr = aiResult as WeekPlanResult;
     return WEEK_KEYS.map((key, idx) => {

@@ -438,7 +438,14 @@ export default function Planejamento() {
       let content = '';
       if ('aulas' in dia) {
         content = (dia as WeekDayRegente).aulas.map(aula =>
-          [`[${aula.disciplina}]`, aula.tema ? `Tema: ${aula.tema}` : '', aula.objetivo ? `Objetivo: ${aula.objetivo}` : ''].filter(Boolean).join('\n')
+          [
+            `[${aula.disciplina}]`,
+            aula.tema ? `Tema: ${aula.tema}` : '',
+            aula.objetivo ? `Objetivo: ${aula.objetivo}` : '',
+            aula.bncc ? `BNCC: ${aula.bncc.codigo} – ${aula.bncc.descricao}` : '',
+            aula.descricao ? `Descrição da aula: ${aula.descricao}` : '',
+            aula.atividade ? `Atividade sugerida: ${aula.atividade}` : '',
+          ].filter(Boolean).join('\n')
         ).join('\n\n');
       } else {
         const d = dia as WeekDayDisciplina;
