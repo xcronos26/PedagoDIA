@@ -103,6 +103,8 @@ export default function Planejamento() {
   const [aiPlanMode, setAiPlanMode] = useState<"day" | "week">("day");
   const [aiPlanLoading, setAiPlanLoading] = useState(false);
   const [aiPlanResult, setAiPlanResult] = useState<DayPlan | WeekPlan | null>(null);
+  const [aiPlanHistory, setAiPlanHistory] = useState<(DayPlan | WeekPlan)[]>([]);
+  const [aiPlanHistoryIdx, setAiPlanHistoryIdx] = useState(0);
 
   const [aiActivityModal, setAiActivityModal] = useState(false);
   const [aiActivitySerie, setAiActivitySerie] = useState("");
@@ -251,8 +253,14 @@ export default function Planejamento() {
   }, [activities, selectedPlan]);
 
   const openAiPlanModal = () => {
-    setAiPlanResult(null);
     if (tema) setAiPlanTema(tema);
+    if (aiPlanHistory.length > 0) {
+      const lastIdx = aiPlanHistory.length - 1;
+      setAiPlanHistoryIdx(lastIdx);
+      setAiPlanResult(aiPlanHistory[lastIdx]);
+    } else {
+      setAiPlanResult(null);
+    }
     setAiPlanModal(true);
   };
 
@@ -262,7 +270,6 @@ export default function Planejamento() {
       return;
     }
     setAiPlanLoading(true);
-    setAiPlanResult(null);
     try {
       const result = await apiFetch("/ai/generate-plan", {
         method: "POST",
@@ -277,7 +284,13 @@ export default function Planejamento() {
             : undefined,
         }),
       });
-      setAiPlanResult(result as DayPlan | WeekPlan);
+      const newEntry = result as DayPlan | WeekPlan;
+      setAiPlanHistory(prev => {
+        const updated = [...prev, newEntry].slice(-3);
+        setAiPlanHistoryIdx(updated.length - 1);
+        return updated;
+      });
+      setAiPlanResult(newEntry);
     } catch {
       toast({ title: "Erro ao gerar planejamento", description: "Verifique sua conexão e tente novamente.", variant: "destructive" });
     } finally {
@@ -348,7 +361,6 @@ export default function Planejamento() {
       toast({ title: `Semana aplicada com sucesso!`, description: `${applied} dias de planejamento salvos.` });
     }
     setAiPlanModal(false);
-    setAiPlanResult(null);
   };
 
   const handleGenerateActivity = async () => {
@@ -707,13 +719,22 @@ export default function Planejamento() {
                   </div>
                   <h2 className="text-lg font-display font-bold text-foreground">Gerar Planejamento com IA</h2>
                 </div>
-                <button onClick={() => { setAiPlanModal(false); setAiPlanResult(null); }} className="p-2 rounded-xl hover:bg-muted/60 text-muted-foreground transition-colors">
+                <button onClick={() => setAiPlanModal(false)} className="p-2 rounded-xl hover:bg-muted/60 text-muted-foreground transition-colors">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {!aiPlanResult ? (
                 <div className="space-y-4">
+                  {aiPlanHistory.length > 0 && (
+                    <button
+                      onClick={() => { setAiPlanHistoryIdx(aiPlanHistory.length - 1); setAiPlanResult(aiPlanHistory[aiPlanHistory.length - 1]); }}
+                      className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-xl bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-900/40 transition-colors"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Ver versão anterior ({aiPlanHistory.length}/{3})
+                    </button>
+                  )}
                   <div>
                     <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-1.5 block">Modo</label>
                     <div className="flex gap-2">
@@ -760,6 +781,27 @@ export default function Planejamento() {
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {aiPlanHistory.length > 1 && (
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide shrink-0">Versões:</p>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {aiPlanHistory.map((_, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => { setAiPlanHistoryIdx(idx); setAiPlanResult(aiPlanHistory[idx]); }}
+                            className={cn(
+                              "px-3 py-1 rounded-lg text-xs font-semibold transition-all",
+                              aiPlanHistoryIdx === idx
+                                ? "bg-violet-600 text-white shadow-sm shadow-violet-500/20"
+                                : "bg-muted/40 text-foreground hover:bg-muted/70"
+                            )}
+                          >
+                            V{idx + 1}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {isDayPlan && (
                     <div className="space-y-3">
                       <div className="p-4 bg-violet-50 dark:bg-violet-950/30 rounded-2xl border border-violet-200 dark:border-violet-800">
@@ -813,11 +855,15 @@ export default function Planejamento() {
                   )}
 
                   <div className="flex gap-2 pt-2">
-                    <button onClick={() => setAiPlanResult(null)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-muted/40 hover:bg-muted/70 text-foreground transition-colors">
-                      ← Refazer
+                    <button
+                      onClick={() => setAiPlanResult(null)}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-muted/40 hover:bg-muted/70 text-foreground transition-colors"
+                      title={aiPlanHistory.length >= 3 ? "O histórico está cheio — a próxima geração substituirá a versão mais antiga" : undefined}
+                    >
+                      {aiPlanHistory.length >= 3 ? "↺ Gerar nova" : "← Nova geração"}
                     </button>
                     {isDayPlan && selectedDate && (
-                      <button onClick={() => { applyDayPlan(aiPlanResult as DayPlan); setAiPlanModal(false); setAiPlanResult(null); }} className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md hover:shadow-lg transition-all">
+                      <button onClick={() => { applyDayPlan(aiPlanResult as DayPlan); setAiPlanModal(false); }} className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md hover:shadow-lg transition-all">
                         Aplicar ao dia
                       </button>
                     )}
