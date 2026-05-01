@@ -113,14 +113,22 @@ router.post("/classes", requireAuth, async (req, res) => {
 router.put("/classes/:id", requireAuth, async (req, res) => {
   try {
     const classId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    const { name } = req.body;
+    const { name, color } = req.body;
     if (!name || typeof name !== "string" || name.trim() === "") {
       res.status(400).json({ error: "Nome da turma é obrigatório" });
       return;
     }
+    if (color !== undefined && (typeof color !== "string" || !/^#[0-9A-Fa-f]{6}$/.test(color))) {
+      res.status(400).json({ error: "Cor inválida. Use um código hexadecimal de 6 dígitos (ex: #4F7BF7)" });
+      return;
+    }
+    const updateData: Record<string, string> = { name: name.trim() };
+    if (color) {
+      updateData.color = color;
+    }
     const [updated] = await db
       .update(classesTable)
-      .set({ name: name.trim() })
+      .set(updateData)
       .where(and(eq(classesTable.id, classId), eq(classesTable.teacherId, req.teacherId!)))
       .returning();
     if (!updated) {

@@ -77,7 +77,7 @@ interface AppContextValue {
   getDeliveriesForStudent: (studentId: string) => DeliveryRecord[];
   addSubject: (subject: string) => Promise<void>;
   addClass: (name: string) => Promise<void>;
-  updateClass: (id: string, name: string) => Promise<void>;
+  updateClass: (id: string, name: string, color?: string) => Promise<void>;
   deleteClass: (id: string) => Promise<void>;
 }
 
@@ -448,13 +448,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [token, withErrorHandling]);
 
-  const updateClass = useCallback(async (id: string, name: string) => {
+  const updateClass = useCallback(async (id: string, name: string, color?: string) => {
     const trimmed = name.trim();
     if (!trimmed || !token) return;
     await withErrorHandling(async () => {
+      const body: Record<string, unknown> = { name: trimmed };
+      if (color) body.color = color;
       const turma = await apiFetch<ApiTurma>(`/classes/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ name: trimmed }),
+        body: JSON.stringify(body),
         token,
       });
       setClasses(prev =>

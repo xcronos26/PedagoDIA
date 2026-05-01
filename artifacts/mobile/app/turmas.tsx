@@ -11,6 +11,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +20,19 @@ import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/colors';
 import { useApp, Turma } from '@/context/AppContext';
 import { DataLoadingWrapper } from '@/components/DataLoadingWrapper';
+
+const CLASS_COLORS = [
+  '#4F7BF7',
+  '#F7634F',
+  '#4FBF87',
+  '#F7B74F',
+  '#9B4FF7',
+  '#F74FAA',
+  '#4FBFBF',
+  '#F78C4F',
+  '#7C4FF7',
+  '#4FAF5A',
+];
 
 export default function TurmasScreen() {
   const insets = useSafeAreaInsets();
@@ -29,6 +43,7 @@ export default function TurmasScreen() {
   const [selectedTurma, setSelectedTurma] = useState<Turma | null>(null);
   const [newName, setNewName] = useState('');
   const [editName, setEditName] = useState('');
+  const [editColor, setEditColor] = useState<string>(CLASS_COLORS[0]);
   const [saving, setSaving] = useState(false);
 
   const topPadding = Platform.OS === 'web' ? 40 : insets.top;
@@ -51,7 +66,7 @@ export default function TurmasScreen() {
     if (!editName.trim() || !selectedTurma || saving) return;
     setSaving(true);
     try {
-      await updateClass(selectedTurma.id, editName.trim());
+      await updateClass(selectedTurma.id, editName.trim(), editColor);
       setShowEditModal(false);
       setSelectedTurma(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -78,16 +93,20 @@ export default function TurmasScreen() {
     );
   };
 
+  const openEdit = (turma: Turma) => {
+    setSelectedTurma(turma);
+    setEditName(turma.name);
+    setEditColor(turma.color ?? CLASS_COLORS[0]);
+    setShowEditModal(true);
+  };
+
   const openOptions = (turma: Turma) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSelectedTurma(turma);
     Alert.alert(turma.name, undefined, [
       {
-        text: 'Editar nome',
-        onPress: () => {
-          setEditName(turma.name);
-          setShowEditModal(true);
-        },
+        text: 'Editar',
+        onPress: () => openEdit(turma),
       },
       {
         text: 'Excluir',
@@ -150,11 +169,12 @@ export default function TurmasScreen() {
               <TouchableOpacity
                 style={styles.turmaCard}
                 onLongPress={() => openOptions(item)}
+                onPress={() => openEdit(item)}
                 activeOpacity={0.85}
                 delayLongPress={400}
               >
-                <View style={styles.turmaIcon}>
-                  <Ionicons name="layers-outline" size={22} color={Colors.primary} />
+                <View style={[styles.turmaIcon, { backgroundColor: item.color + '22' }]}>
+                  <View style={[styles.turmaColorDot, { backgroundColor: item.color }]} />
                 </View>
                 <View style={styles.turmaInfo}>
                   <Text style={styles.turmaName}>{item.name}</Text>
@@ -234,6 +254,31 @@ export default function TurmasScreen() {
               returnKeyType="done"
               onSubmitEditing={handleEdit}
             />
+            <View>
+              <Text style={styles.colorLabel}>Cor da turma</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.colorSwatches}
+              >
+                {CLASS_COLORS.map(color => (
+                  <TouchableOpacity
+                    key={color}
+                    style={[
+                      styles.swatch,
+                      { backgroundColor: color },
+                      editColor === color && styles.swatchSelected,
+                    ]}
+                    onPress={() => setEditColor(color)}
+                    activeOpacity={0.8}
+                  >
+                    {editColor === color && (
+                      <Ionicons name="checkmark" size={18} color="#fff" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.cancelBtn}
@@ -313,9 +358,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: Colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  turmaColorDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
   },
   turmaInfo: {
     flex: 1,
@@ -412,6 +461,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter_400Regular',
     color: Colors.text,
+  },
+  colorLabel: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginBottom: 10,
+  },
+  colorSwatches: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingBottom: 4,
+  },
+  swatch: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swatchSelected: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
+    transform: [{ scale: 1.15 }],
   },
   modalButtons: {
     flexDirection: 'row',
