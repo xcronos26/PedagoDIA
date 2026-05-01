@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { format, parseISO, startOfMonth, endOfMonth, eachWeekOfInterval, endOfWeek, eachDayOfInterval, isSameMonth, isToday, addMonths, subMonths, addDays, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, CalendarDays, BookOpen, Plus, X, Save, Loader2, Sparkles, Wand2, Brain } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, BookOpen, Plus, X, Save, Loader2, Sparkles, Wand2, Brain, Copy, Check } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useLessonPlans, useUpsertLessonPlan, useLinkActivity, useUnlinkActivity, type LessonPlan } from "@/hooks/use-lesson-plans";
@@ -417,6 +417,55 @@ export default function Planejamento() {
 
   const isDayPlan = aiPlanResult && !("semana" in aiPlanResult);
   const isWeekPlan = aiPlanResult && "semana" in aiPlanResult;
+
+  const [copiedPlan, setCopiedPlan] = useState(false);
+
+  const buildPlanText = useCallback(() => {
+    if (!aiPlanResult) return '';
+    if (isDayPlan) {
+      const p = aiPlanResult as DayPlan;
+      return [
+        p.tema ? `Tema: ${p.tema}` : '',
+        p.objetivo ? `Objetivo: ${p.objetivo}` : '',
+        p.bncc ? `BNCC: ${p.bncc.codigo} – ${p.bncc.descricao}` : '',
+        p.descricao ? `Descrição da aula: ${p.descricao}` : '',
+        p.atividade ? `Atividade sugerida: ${p.atividade}` : '',
+      ].filter(Boolean).join('\n\n');
+    }
+    const wp = aiPlanResult as WeekPlan;
+    return (wp.semana as (WeekDayRegente | WeekDayDisciplina)[]).map(dia => {
+      const dayName = 'dia' in dia ? dia.dia : '';
+      let content = '';
+      if ('aulas' in dia) {
+        content = (dia as WeekDayRegente).aulas.map(aula =>
+          [`[${aula.disciplina}]`, aula.tema ? `Tema: ${aula.tema}` : '', aula.objetivo ? `Objetivo: ${aula.objetivo}` : ''].filter(Boolean).join('\n')
+        ).join('\n\n');
+      } else {
+        const d = dia as WeekDayDisciplina;
+        content = [
+          d.tema ? `Tema: ${d.tema}` : '',
+          d.objetivo ? `Objetivo: ${d.objetivo}` : '',
+          d.bncc ? `BNCC: ${d.bncc.codigo} – ${d.bncc.descricao}` : '',
+          d.descricao ? `Descrição: ${d.descricao}` : '',
+          d.atividade ? `Atividade: ${d.atividade}` : '',
+        ].filter(Boolean).join('\n');
+      }
+      return `── ${dayName} ──\n${content}`;
+    }).join('\n\n');
+  }, [aiPlanResult, isDayPlan]);
+
+  const copyPlanToClipboard = useCallback(async () => {
+    const text = buildPlanText();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedPlan(true);
+      toast({ title: 'Copiado!', description: 'Planejamento copiado para a área de transferência.' });
+      setTimeout(() => setCopiedPlan(false), 2000);
+    } catch {
+      toast({ title: 'Erro ao copiar', variant: 'destructive' });
+    }
+  }, [buildPlanText, toast]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -860,7 +909,15 @@ export default function Planejamento() {
                     </div>
                   )}
 
-                  <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={copyPlanToClipboard}
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800 hover:bg-violet-100 dark:hover:bg-violet-900/40 transition-colors"
+                  >
+                    {copiedPlan ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedPlan ? "Copiado!" : "Copiar texto"}
+                  </button>
+
+                  <div className="flex gap-2">
                     <button
                       onClick={() => setAiPlanResult(null)}
                       className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-muted/40 hover:bg-muted/70 text-foreground transition-colors"

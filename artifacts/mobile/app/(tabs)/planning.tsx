@@ -11,6 +11,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   ActivityIndicator,
+  Share,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -476,6 +477,41 @@ export default function PlanningScreen() {
     setAiResultModal(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
+
+  const buildShareText = useCallback((): string => {
+    if (!aiResult) return '';
+    if (aiMode === 'day') {
+      const p = aiResult as DayPlanResult;
+      return formatDayDescription(p);
+    }
+    const wr = aiResult as WeekPlanResult;
+    return WEEK_KEYS.map((key, idx) => {
+      const p = wr[key];
+      if (!p) return null;
+      const parts: string[] = [`── ${WEEKDAY_PT[idx]} ──`];
+      if (p.tema) parts.push(`Tema: ${p.tema}`);
+      if (p.objetivo) parts.push(`Objetivo: ${p.objetivo}`);
+      const bnccStr = p.bncc
+        ? `BNCC: ${p.bncc.codigo} – ${p.bncc.descricao}`
+        : p.habilidade_bncc ? `BNCC: ${p.habilidade_bncc}` : '';
+      if (bnccStr) parts.push(bnccStr);
+      const desc = p.descricao ?? p.descritivo ?? '';
+      if (desc) parts.push(desc);
+      const atv = p.atividade ?? p.atividade_sugerida ?? '';
+      if (atv) parts.push(`Atividade: ${atv}`);
+      return parts.join('\n');
+    }).filter(Boolean).join('\n\n');
+  }, [aiResult, aiMode]);
+
+  const sharePlan = useCallback(async () => {
+    const text = buildShareText();
+    if (!text) return;
+    try {
+      await Share.share({ message: text, title: 'Planejamento pedagógico' });
+    } catch {
+      // user cancelled or share failed — silent
+    }
+  }, [buildShareText]);
 
   // ── AI ACTIVITY ────────────────────────────────────────────
   const openAiActModal = (dateStr: string) => {
@@ -1036,6 +1072,11 @@ export default function PlanningScreen() {
               })()}
             </ScrollView>
 
+            <TouchableOpacity style={ai.shareBtn} onPress={sharePlan} activeOpacity={0.8}>
+              <Ionicons name="share-outline" size={15} color={AI_PURPLE} />
+              <Text style={ai.shareBtnText}>Compartilhar / Copiar</Text>
+            </TouchableOpacity>
+
             <View style={modal.btnRow}>
               <TouchableOpacity
                 style={modal.closeBtn}
@@ -1386,4 +1427,13 @@ const ai = StyleSheet.create({
     fontFamily: 'Inter_700Bold', fontSize: 12, color: Colors.text,
   },
   versionTabTextActive: { color: '#fff' },
+  shareBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 8, marginTop: 10,
+    borderRadius: 10, borderWidth: 1.5,
+    borderColor: AI_PURPLE + '40', backgroundColor: AI_PURPLE_LIGHT,
+  },
+  shareBtnText: {
+    fontFamily: 'Inter_600SemiBold', fontSize: 13, color: AI_PURPLE,
+  },
 });
