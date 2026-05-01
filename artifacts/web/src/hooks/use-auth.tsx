@@ -19,6 +19,8 @@ export interface Teacher {
   name: string;
   email: string;
   weeklySchedule?: WeeklySchedule | null;
+  grade?: string | null;
+  teacherType?: "regente" | "disciplina" | null;
 }
 
 interface AuthContextType {
@@ -26,7 +28,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (token: string, teacher: Teacher) => void;
   logout: () => void;
-  updateProfile: (name: string, weeklySchedule?: WeeklySchedule | null) => Promise<void>;
+  updateProfile: (name: string, weeklySchedule?: WeeklySchedule | null, grade?: string | null, teacherType?: "regente" | "disciplina" | null) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -66,10 +68,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.href = import.meta.env.BASE_URL + 'login';
   };
 
-  const updateProfile = async (name: string, weeklySchedule?: WeeklySchedule | null): Promise<void> => {
+  const updateProfile = async (name: string, weeklySchedule?: WeeklySchedule | null, grade?: string | null, teacherType?: "regente" | "disciplina" | null): Promise<void> => {
     const body: Record<string, unknown> = { name };
     if (weeklySchedule !== undefined) {
       body.weeklySchedule = weeklySchedule;
+    }
+    if (grade !== undefined) {
+      body.grade = grade;
+    }
+    if (teacherType !== undefined) {
+      body.teacherType = teacherType;
     }
     const res = await apiFetch<{ teacher: Teacher }>('/auth/profile', {
       method: 'PATCH',

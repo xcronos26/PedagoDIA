@@ -21,6 +21,8 @@ export const teachersTable = pgTable("teachers", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   weeklySchedule: jsonb("weekly_schedule").$type<WeeklySchedule>(),
+  grade: text("grade"),
+  teacherType: text("teacher_type").$type<"regente" | "disciplina">(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -16,6 +16,8 @@ const PUBLIC_FIELDS = {
   name: teachersTable.name,
   email: teachersTable.email,
   weeklySchedule: teachersTable.weeklySchedule,
+  grade: teachersTable.grade,
+  teacherType: teachersTable.teacherType,
 };
 
 router.post("/auth/register", async (req, res) => {
@@ -45,7 +47,7 @@ router.post("/auth/register", async (req, res) => {
     const token = generateToken({ teacherId: teacher.id, email: teacher.email });
     res.status(201).json({
       token,
-      teacher: { id: teacher.id, name: teacher.name, email: teacher.email, weeklySchedule: teacher.weeklySchedule ?? null },
+      teacher: { id: teacher.id, name: teacher.name, email: teacher.email, weeklySchedule: teacher.weeklySchedule ?? null, grade: teacher.grade ?? null, teacherType: teacher.teacherType ?? null },
     });
   } catch (err) {
     req.log.error({ err }, "Error registering teacher");
@@ -73,7 +75,7 @@ router.post("/auth/login", async (req, res) => {
     const token = generateToken({ teacherId: teacher.id, email: teacher.email });
     res.json({
       token,
-      teacher: { id: teacher.id, name: teacher.name, email: teacher.email, weeklySchedule: teacher.weeklySchedule ?? null },
+      teacher: { id: teacher.id, name: teacher.name, email: teacher.email, weeklySchedule: teacher.weeklySchedule ?? null, grade: teacher.grade ?? null, teacherType: teacher.teacherType ?? null },
     });
   } catch (err) {
     req.log.error({ err }, "Error logging in teacher");
@@ -98,13 +100,13 @@ router.get("/auth/me", requireAuth, async (req, res) => {
 
 router.patch("/auth/profile", requireAuth, async (req, res) => {
   try {
-    const { name, weeklySchedule } = req.body;
+    const { name, weeklySchedule, grade, teacherType } = req.body;
     if (!name || typeof name !== "string" || name.trim() === "") {
       res.status(400).json({ error: "Nome é obrigatório" });
       return;
     }
 
-    const updateData: { name: string; weeklySchedule?: WeeklySchedule | null } = {
+    const updateData: { name: string; weeklySchedule?: WeeklySchedule | null; grade?: string | null; teacherType?: "regente" | "disciplina" | null } = {
       name: name.trim(),
     };
 
@@ -112,11 +114,20 @@ router.patch("/auth/profile", requireAuth, async (req, res) => {
       updateData.weeklySchedule = weeklySchedule ?? null;
     }
 
-    const [teacher] = await db
+    if ("grade" in req.body) {
+      updateData.grade = typeof grade === "string" && grade.trim() ? grade.trim() : null;
+    }
+
+    if ("teacherType" in req.body) {
+      updateData.teacherType = (teacherType === "regente" || teacherType === "disciplina") ? teacherType : null;
+    }
+
+    await db
       .update(teachersTable)
       .set(updateData)
-      .where(eq(teachersTable.id, req.teacherId!))
-      .returning(PUBLIC_FIELDS);
+      .where(eq(teachersTable.id, req.teacherId!));
+    const [teacher] = await db.select(PUBLIC_FIELDS)
+      .from(teachersTable).where(eq(teachersTable.id, req.teacherId!));
     if (!teacher) {
       res.status(404).json({ error: "Professora não encontrada" });
       return;

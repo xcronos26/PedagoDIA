@@ -96,8 +96,8 @@ export default function Planejamento() {
   const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [aiPlanModal, setAiPlanModal] = useState(false);
-  const [aiPlanSerie, setAiPlanSerie] = useState("");
-  const [aiPlanTipo, setAiPlanTipo] = useState<"regente" | "disciplina">("regente");
+  const [aiPlanSerie, setAiPlanSerie] = useState(user?.grade ?? "");
+  const [aiPlanTipo, setAiPlanTipo] = useState<"regente" | "disciplina">(user?.teacherType ?? "regente");
   const [aiPlanDisciplina, setAiPlanDisciplina] = useState("");
   const [aiPlanTema, setAiPlanTema] = useState("");
   const [aiPlanMode, setAiPlanMode] = useState<"day" | "week">("day");
@@ -129,6 +129,12 @@ export default function Planejamento() {
   }, [plans]);
 
   const selectedPlan = selectedDate ? plansByDate[selectedDate] : null;
+
+  useEffect(() => {
+    setAiPlanSerie(user?.grade ?? "");
+    setAiPlanTipo(user?.teacherType ?? "regente");
+    setAiActivitySerie(user?.grade ?? "");
+  }, [user?.grade, user?.teacherType]);
 
   useEffect(() => {
     setDescription(selectedPlan?.description ?? "");

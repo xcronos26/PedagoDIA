@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth, type WeeklySchedule, type DayEntry } from "@/hooks/use-auth";
-import { User, Mail, Save, Loader2, Check, CalendarDays, Plus, X } from "lucide-react";
+import { User, Mail, Save, Loader2, Check, CalendarDays, Plus, X, GraduationCap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -180,10 +180,17 @@ function DayEntryEditor({
   );
 }
 
+const TEACHER_TYPES: { value: "regente" | "disciplina"; label: string }[] = [
+  { value: "regente", label: "Regente" },
+  { value: "disciplina", label: "Disciplina específica" },
+];
+
 export default function Perfil() {
   const { user, updateProfile } = useAuth();
   const { toast } = useToast();
   const [name, setName] = useState(user?.name ?? "");
+  const [grade, setGrade] = useState(user?.grade ?? "");
+  const [teacherType, setTeacherType] = useState<"regente" | "disciplina" | "">(user?.teacherType ?? "");
   const [schedule, setSchedule] = useState<WeeklySchedule>(
     user?.weeklySchedule ?? EMPTY_SCHEDULE
   );
@@ -192,13 +199,17 @@ export default function Perfil() {
 
   useEffect(() => {
     if (user?.name) setName(user.name);
+    setGrade(user?.grade ?? "");
+    setTeacherType(user?.teacherType ?? "");
     if (user?.weeklySchedule) setSchedule(user.weeklySchedule);
     else setSchedule(EMPTY_SCHEDULE);
-  }, [user?.name, user?.weeklySchedule]);
+  }, [user?.name, user?.weeklySchedule, user?.grade, user?.teacherType]);
 
   const hasNameChange = name.trim() !== "" && name.trim() !== user?.name;
+  const hasGradeChange = grade.trim() !== (user?.grade ?? "");
+  const hasTeacherTypeChange = teacherType !== (user?.teacherType ?? "");
   const hasScheduleChange = JSON.stringify(schedule) !== JSON.stringify(user?.weeklySchedule ?? EMPTY_SCHEDULE);
-  const hasChanges = hasNameChange || hasScheduleChange;
+  const hasChanges = hasNameChange || hasGradeChange || hasTeacherTypeChange || hasScheduleChange;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,7 +217,9 @@ export default function Perfil() {
     setIsSaving(true);
     try {
       const scheduleToSave = scheduleIsEmpty(schedule) ? null : schedule;
-      await updateProfile(name.trim(), scheduleToSave);
+      const gradeToSave = grade.trim() || null;
+      const teacherTypeToSave = teacherType || null;
+      await updateProfile(name.trim(), scheduleToSave, gradeToSave, teacherTypeToSave);
       setSaved(true);
       toast({ title: "Perfil atualizado com sucesso!" });
       setTimeout(() => setSaved(false), 2500);
@@ -276,6 +289,46 @@ export default function Perfil() {
               disabled
               className="w-full px-4 py-3 bg-muted/50 border-2 border-border/50 rounded-xl text-muted-foreground font-medium cursor-not-allowed"
             />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-foreground flex items-center gap-2">
+              <GraduationCap className="w-4 h-4 text-primary" />
+              Série que leciona
+              <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+            </label>
+            <input
+              type="text"
+              value={grade}
+              onChange={e => setGrade(e.target.value)}
+              placeholder="Ex: 4º ano, 8º ano, 2º ano EF..."
+              className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none text-foreground font-medium transition-all"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-foreground flex items-center gap-2">
+              <User className="w-4 h-4 text-primary" />
+              Tipo de professor
+              <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+            </label>
+            <div className="flex gap-2">
+              {TEACHER_TYPES.map(t => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setTeacherType(prev => prev === t.value ? "" : t.value)}
+                  className={cn(
+                    "flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 transition-colors",
+                    teacherType === t.value
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-foreground border-border hover:bg-muted/60"
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
