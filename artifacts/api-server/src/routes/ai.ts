@@ -266,4 +266,89 @@ router.post("/ai/generate-activity", requireAuth, requirePlan("advanced"), async
   }
 });
 
+const EXAM_PROMPT = (
+  disciplina: string,
+  serie: string,
+  tema: string,
+  nivel: string,
+  n: number,
+  tipo: string,
+  atividadesBase?: Array<{ tema: string; descricao: string }>
+) => {
+  const tipoStr =
+    tipo === "multipla_escolha"
+      ? "múltipla escolha (4 alternativas A/B/C/D)"
+      : tipo === "dissertativa"
+      ? "dissertativa (resposta aberta)"
+      : "misto (metade múltipla escolha, metade dissertativa)";
+
+  const atividadesSection =
+    atividadesBase && atividadesBase.length > 0
+      ? `\nUse os seguintes temas e conteúdos como referência para gerar as questões. Crie questões NOVAS e INÉDITAS sobre esses conteúdos — NÃO copie as atividades originais:\n${atividadesBase.map((a, i) => `  ${i + 1}. Tema: "${a.tema}" — ${a.descricao}`).join("\n")}`
+      : "";
+
+  const dissertativaNote =
+    tipo === "dissertativa"
+      ? '\n- Para questões dissertativas, omita o campo "alternativas" e "resposta_correta"'
+      : tipo === "misto"
+      ? '\n- Para questões dissertativas (a partir da metade), omita "alternativas" e "resposta_correta"'
+      : "";
+
+  return `Você é um assistente pedagógico especializado em criar avaliações escolares brasileiras.
+
+Gere uma prova com ${n} questões de ${tipoStr} sobre "${tema}" para ${serie}.
+Disciplina: ${disciplina}
+Nível de dificuldade: ${nivel}.${atividadesSection}
+
+Para cada questão retorne:
+- Enunciado claro e objetivo
+- 4 alternativas (A, B, C, D) se for múltipla escolha${dissertativaNote}
+- A alternativa correta (para múltipla escolha)
+- O conteúdo/habilidade avaliada (ex: "adição de frações — nível básico")
+
+Responda APENAS em JSON válido, sem markdown, sem texto adicional:
+{
+  "questoes": [
+    {
+      "numero": 1,
+      "enunciado": "...",
+      "alternativas": { "A": "...", "B": "...", "C": "...", "D": "..." },
+      "resposta_correta": "A",
+      "descritivo": "..."
+    }
+  ]
+}`;
+};
+
+router.post("/ai/generate-exam", requireAuth, async (req, res) => {
+  try {
+    const { disciplina, serieTurma, tema, nivelDificuldade, numeroQuestoes, tipoQuestao, atividadesBase } = req.body;
+
+    if (!disciplina || !serieTurma || !tema || !nivelDificuldade || !numeroQuestoes || !tipoQuestao) {
+      res.status(400).json({ error: "Campos obrigatórios: disciplina, serieTurma, tema, nivelDificuldade, numeroQuestoes, tipoQuestao" });
+      return;
+    }
+
+    const n = Number(numeroQuestoes);
+    if (isNaN(n) || n < 1 || n > 20) {
+      res.status(400).json({ error: "numeroQuestoes deve ser entre 1 e 20" });
+      return;
+    }
+
+    const prompt = EXAM_PROMPT(disciplina, serieTurma, tema, nivelDificuldade, n, tipoQuestao, atividadesBase);
+    const { text: raw, provider } = await generateContent(prompt);
+    req.log.info({ provider }, "AI generate-exam completed");
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed.questoes)) {
+      throw new Error("Resposta da IA inválida");
+    }
+
+    res.json({ questoes: parsed.questoes });
+  } catch (err) {
+    req.log.error({ err }, "Error in AI generate-exam");
+    res.status(getAiErrorStatus(err)).json({ error: getAiErrorMessage(err, "Erro ao gerar prova") });
+  }
+});
+
 export default router;

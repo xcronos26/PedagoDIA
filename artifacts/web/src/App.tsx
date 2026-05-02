@@ -21,6 +21,7 @@ import Sobre from "@/pages/sobre";
 import BemVinda from "@/pages/bem-vinda";
 import Perfil from "@/pages/perfil";
 import Turmas from "@/pages/turmas";
+import Provas from "@/pages/provas";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -72,6 +73,7 @@ function Router() {
             <Route path="/atividades"><ProtectedRoute component={Atividades} /></Route>
             <Route path="/relatorios"><ProtectedRoute component={Relatorios} /></Route>
             <Route path="/planejamento"><ProtectedRoute component={Planejamento} /></Route>
+            <Route path="/provas"><ProtectedRoute component={Provas} /></Route>
             <Route path="/sobre"><ProtectedRoute component={Sobre} /></Route>
             <Route component={NotFound} />
           </Switch>

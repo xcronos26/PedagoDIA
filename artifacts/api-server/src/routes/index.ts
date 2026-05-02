@@ -12,6 +12,7 @@ import studentReportsRouter from "./student-reports";
 import lessonPlansRouter from "./lesson-plans";
 import aiRouter from "./ai";
 import billingRouter from "./billing";
+import examsRouter from "./exams";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(studentReportsRouter);
 router.use(lessonPlansRouter);
 router.use(aiRouter);
 router.use(billingRouter);
+router.use(examsRouter);
 
 export default router;

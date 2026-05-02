@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { CalendarDays, CheckSquare, BookOpen, BarChart3, LogOut, GraduationCap, LayoutDashboard, ClipboardList, Heart, Users, User } from "lucide-react";
+import { CalendarDays, CheckSquare, BookOpen, BarChart3, LogOut, GraduationCap, LayoutDashboard, ClipboardList, Heart, Users, User, FileText } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -17,6 +17,7 @@ const navItems = [
   { name: "Diário", href: "/diario", icon: CalendarDays },
   { name: "Atividades", href: "/atividades", icon: BookOpen },
   { name: "Planejamento", href: "/planejamento", icon: ClipboardList },
+  { name: "Provas", href: "/provas", icon: FileText },
   { name: "Relatórios", href: "/relatorios", icon: BarChart3 },
   { name: "Sobre", href: "/sobre", icon: Heart, mobileHide: true },
 ];

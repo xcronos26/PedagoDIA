@@ -7,3 +7,4 @@ export * from "./activities";
 export * from "./deliveries";
 export * from "./student-reports";
 export * from "./lesson-plans";
+export * from "./exams";
