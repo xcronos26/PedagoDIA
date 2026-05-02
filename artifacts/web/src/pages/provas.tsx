@@ -1019,15 +1019,18 @@ function ExamWizard({
     picked.forEach((q) => {
       if (q.resposta_correta) gab[q.numero] = q.resposta_correta;
     });
+    const hasAlt = picked.some((q) => !!q.alternativas);
+    const hasDiss = picked.some((q) => !q.alternativas);
+    const derivedTipo: TipoQuestao =
+      hasAlt && hasDiss ? "misto" : hasAlt ? "multipla_escolha" : "dissertativa";
     setQuestoes(picked);
     setGabarito(gab);
-    setConfig((c) => ({ ...c, numeroQuestoes: picked.length }));
+    setConfig((c) => ({ ...c, numeroQuestoes: picked.length, tipoQuestao: derivedTipo }));
     setShowBancoPicker(false);
     setStep(4);
   };
 
   const handleSave = (status: StatusProva) => {
-    const origemApi: OrigemProva = config.origem === "banco" ? "misto" : config.origem;
     const payload = {
       titulo: config.titulo || `${config.disciplina} — ${config.serieTurma}`,
       disciplina: config.disciplina,
@@ -1036,7 +1039,7 @@ function ExamWizard({
       numeroQuestoes: String(questoes.length || config.numeroQuestoes),
       valorTotal: String(config.valorTotal),
       tipoQuestao: config.tipoQuestao,
-      origem: origemApi,
+      origem: config.origem as OrigemProva,
       atividadesBaseIds: config.atividadesSelecionadas,
       questoes,
       gabarito,

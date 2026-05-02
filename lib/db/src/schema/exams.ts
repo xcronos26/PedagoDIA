@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, jsonb, numeric } from "drizzle-orm/pg-core";
 
 export type TipoQuestao = "multipla_escolha" | "dissertativa" | "misto";
-export type OrigemProva = "ia" | "atividades" | "misto";
+export type OrigemProva = "ia" | "atividades" | "misto" | "banco";
 export type StatusProva = "rascunho" | "ativa" | "finalizada";
 export type NivelDificuldade = "facil" | "medio" | "dificil";
 
