@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, activitiesTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
+import { requireFreePlanLimit } from "../middlewares/plan";
 
 const router: IRouter = Router();
 
@@ -33,7 +34,7 @@ router.get("/activities", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/activities", requireAuth, async (req, res) => {
+router.post("/activities", requireAuth, requireFreePlanLimit("activities"), async (req, res) => {
   try {
     const { subject, type, link, date, description } = req.body;
     if (!subject || !type || !date || !description) {

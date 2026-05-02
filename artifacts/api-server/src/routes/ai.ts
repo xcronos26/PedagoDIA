@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../middlewares/auth";
+import { requirePlan } from "../middlewares/plan";
 import { generateContent, getAiErrorStatus, getAiErrorMessage } from "../lib/ai-provider";
 import type { WeeklySchedule, DayEntry } from "@workspace/db";
 
@@ -206,7 +207,7 @@ router.post("/ai/suggest", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/ai/generate-plan", requireAuth, async (req, res) => {
+router.post("/ai/generate-plan", requireAuth, requirePlan("advanced"), async (req, res) => {
   try {
     const { mode, serie, tipo, disciplina, tema, weeklySchedule } = req.body;
 
@@ -239,7 +240,7 @@ router.post("/ai/generate-plan", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/ai/generate-activity", requireAuth, async (req, res) => {
+router.post("/ai/generate-activity", requireAuth, requirePlan("advanced"), async (req, res) => {
   try {
     const { serie, disciplina, tema } = req.body;
     if (!disciplina || !tema) {

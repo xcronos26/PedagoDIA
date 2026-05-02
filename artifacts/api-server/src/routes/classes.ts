@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, classesTable, studentsTable } from "@workspace/db";
 import { eq, and, sql, count } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
+import { requireFreePlanLimit } from "../middlewares/plan";
 
 const router: IRouter = Router();
 
@@ -73,7 +74,7 @@ router.get("/classes", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/classes", requireAuth, async (req, res) => {
+router.post("/classes", requireAuth, requireFreePlanLimit("classes"), async (req, res) => {
   try {
     const { name, color: requestedColor } = req.body;
     if (!name || typeof name !== "string" || name.trim() === "") {
