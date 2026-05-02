@@ -76,7 +76,7 @@ interface AppContextValue {
   getDeliveriesForActivity: (activityId: string) => DeliveryRecord[];
   getDeliveriesForStudent: (studentId: string) => DeliveryRecord[];
   addSubject: (subject: string) => Promise<void>;
-  addClass: (name: string) => Promise<void>;
+  addClass: (name: string, color?: string) => Promise<void>;
   updateClass: (id: string, name: string, color?: string) => Promise<void>;
   deleteClass: (id: string) => Promise<void>;
 }
@@ -444,13 +444,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [token, subjects, withErrorHandling]);
 
-  const addClass = useCallback(async (name: string) => {
+  const addClass = useCallback(async (name: string, color?: string) => {
     const trimmed = name.trim();
     if (!trimmed || !token) return;
     await withErrorHandling(async () => {
+      const body: Record<string, string> = { name: trimmed };
+      if (color) body.color = color;
       const turma = await apiFetch<ApiTurma>('/classes', {
         method: 'POST',
-        body: JSON.stringify({ name: trimmed }),
+        body: JSON.stringify(body),
         token,
       });
       setClasses(prev => [...prev, { ...turma, color: turma.color ?? '#4F7BF7' }].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')));

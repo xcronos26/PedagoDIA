@@ -75,9 +75,13 @@ router.get("/classes", requireAuth, async (req, res) => {
 
 router.post("/classes", requireAuth, async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, color: requestedColor } = req.body;
     if (!name || typeof name !== "string" || name.trim() === "") {
       res.status(400).json({ error: "Nome da turma é obrigatório" });
+      return;
+    }
+    if (requestedColor !== undefined && (typeof requestedColor !== "string" || !/^#[0-9A-Fa-f]{6}$/.test(requestedColor))) {
+      res.status(400).json({ error: "Cor inválida. Use um código hexadecimal de 6 dígitos (ex: #4F7BF7)" });
       return;
     }
 
@@ -86,7 +90,7 @@ router.post("/classes", requireAuth, async (req, res) => {
       .from(classesTable)
       .where(eq(classesTable.teacherId, req.teacherId!));
 
-    const color = CLASS_COLORS[Number(total) % CLASS_COLORS.length];
+    const color = requestedColor ?? CLASS_COLORS[Number(total) % CLASS_COLORS.length];
 
     const [created] = await db
       .insert(classesTable)

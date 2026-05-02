@@ -42,6 +42,7 @@ export default function TurmasScreen() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedTurma, setSelectedTurma] = useState<Turma | null>(null);
   const [newName, setNewName] = useState('');
+  const [newColor, setNewColor] = useState<string>(CLASS_COLORS[0]);
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState<string>(CLASS_COLORS[0]);
   const [saving, setSaving] = useState(false);
@@ -53,8 +54,9 @@ export default function TurmasScreen() {
     if (!newName.trim() || saving) return;
     setSaving(true);
     try {
-      await addClass(newName.trim());
+      await addClass(newName.trim(), newColor);
       setNewName('');
+      setNewColor(CLASS_COLORS[0]);
       setShowAddModal(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } finally {
@@ -213,10 +215,35 @@ export default function TurmasScreen() {
               returnKeyType="done"
               onSubmitEditing={handleAdd}
             />
+            <View>
+              <Text style={styles.colorLabel}>Cor da turma</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.colorSwatches}
+              >
+                {CLASS_COLORS.map(color => (
+                  <TouchableOpacity
+                    key={color}
+                    style={[
+                      styles.swatch,
+                      { backgroundColor: color },
+                      newColor === color && styles.swatchSelected,
+                    ]}
+                    onPress={() => setNewColor(color)}
+                    activeOpacity={0.8}
+                  >
+                    {newColor === color && (
+                      <Ionicons name="checkmark" size={18} color="#fff" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.cancelBtn}
-                onPress={() => { setShowAddModal(false); setNewName(''); }}
+                onPress={() => { setShowAddModal(false); setNewName(''); setNewColor(CLASS_COLORS[0]); }}
                 activeOpacity={0.8}
               >
                 <Text style={styles.cancelText}>Cancelar</Text>
