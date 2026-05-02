@@ -70,6 +70,15 @@ const MENU_ITEMS = [
     bg: '#FCE7F3',
   },
   {
+    label: 'Rel. Bimestral',
+    icon: 'book-open',
+    lib: 'feather' as const,
+    description: 'Relatório para Secretaria',
+    route: '/relatorio-bimestral',
+    color: '#7C3AED',
+    bg: '#EDE9FE',
+  },
+  {
     label: 'Turmas',
     icon: 'layers',
     lib: 'feather' as const,

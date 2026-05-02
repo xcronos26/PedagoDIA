@@ -17,6 +17,7 @@ import adminRouter from "./admin";
 import schoolsRouter from "./schools";
 import escolaRouter from "./escola";
 import questionsRouter from "./questions";
+import relatoriosBimestraisRouter from "./relatorios-bimestrais";
 
 const router: IRouter = Router();
 
@@ -38,5 +39,6 @@ router.use(adminRouter);
 router.use(schoolsRouter);
 router.use(escolaRouter);
 router.use(questionsRouter);
+router.use(relatoriosBimestraisRouter);
 
 export default router;

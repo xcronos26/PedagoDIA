@@ -147,6 +147,13 @@ function ClassicTabLayout() {
           title: "Sobre",
         }}
       />
+      <Tabs.Screen
+        name="relatorio-bimestral"
+        options={{
+          href: null,
+          title: "Rel. Bimestral",
+        }}
+      />
     </Tabs>
   );
 }

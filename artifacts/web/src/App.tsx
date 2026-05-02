@@ -24,6 +24,7 @@ import Turmas from "@/pages/turmas";
 import Provas from "@/pages/provas";
 import Admin from "@/pages/admin";
 import Escola from "@/pages/escola";
+import RelatorioBimestral from "@/pages/relatorio-bimestral";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -87,6 +88,7 @@ function Router() {
             <Route path="/relatorios"><ProtectedRoute component={Relatorios} /></Route>
             <Route path="/planejamento"><ProtectedRoute component={Planejamento} /></Route>
             <Route path="/provas"><ProtectedRoute component={Provas} /></Route>
+            <Route path="/relatorio-bimestral"><ProtectedRoute component={RelatorioBimestral} /></Route>
             <Route path="/sobre"><ProtectedRoute component={Sobre} /></Route>
             <Route path="/admin"><RoleRoute component={Admin} roles={["super_admin"]} /></Route>
             <Route path="/escola"><RoleRoute component={Escola} roles={["admin_institucional", "super_admin"]} /></Route>

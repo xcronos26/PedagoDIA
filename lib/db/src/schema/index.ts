@@ -12,3 +12,4 @@ export * from "./schools";
 export * from "./memberships";
 export * from "./prompt-logs";
 export * from "./questions";
+export * from "./relatorios-bimestrais";
