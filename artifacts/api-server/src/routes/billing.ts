@@ -136,11 +136,15 @@ router.post("/billing/subscribe", requireAuth, async (req, res) => {
     const subscriptionId = subscription.id as string;
     const paymentLink = (subscription.paymentLink as string | undefined) ?? null;
 
-    // Save Asaas IDs only — plan status is NOT upgraded here.
-    // Premium access is only granted after PAYMENT_CONFIRMED webhook is received.
+    // Save Asaas IDs and the chosen planType now, but keep planStatus unchanged.
+    // The planType is stored so the webhook knows which tier to activate on confirmation.
+    // Premium access (planStatus=active) is only granted after PAYMENT_CONFIRMED webhook.
     await db
       .update(teachersTable)
-      .set({ asaasSubscriptionId: subscriptionId })
+      .set({
+        asaasSubscriptionId: subscriptionId,
+        planType: planType as "basic" | "medium" | "advanced",
+      })
       .where(eq(teachersTable.id, teacher.id));
 
     res.json({
