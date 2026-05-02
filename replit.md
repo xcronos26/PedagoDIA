@@ -101,6 +101,31 @@ Express 5 API with JWT auth. All data routes require Bearer token.
 - **Login**: Blocked users get 403. Login + register + /auth/me now return `role` and `vinculo` in teacher object
 - **Existing professors**: Unaffected — all defaults (role=professor, vinculo=individual, isBlocked=false) applied via DB column defaults
 
+### Relatório Bimestral
+
+Nova seção **"Rel. Bimestral"** adicionada ao menu do web e do app mobile.
+
+- **Banco**: tabela `relatorios_bimestrais` (id, teacherId, studentId, studentName, bimestre, anoLetivo, serieTurma, dadosAutomaticos JSONB, observacoesProfessor JSONB, textoGerado, status, createdAt, updatedAt). Índice único por (teacherId, studentId, bimestre, anoLetivo) — upsert automático.
+- **API**: `artifacts/api-server/src/routes/relatorios-bimestrais.ts`
+  - `GET /api/relatorios-bimestrais` — lista por bimestre/anoLetivo do professor logado
+  - `GET /api/relatorios-bimestrais/:id` — busca por id
+  - `GET /api/relatorios-bimestrais/student/:studentId` — relatórios do aluno
+  - `GET /api/relatorios-bimestrais/dados/:studentId?bimestre=&anoLetivo=` — dados automáticos (faltas, atividades)
+  - `POST /api/relatorios-bimestrais` — criar/upsert (rascunho ou finalizado)
+  - `PUT /api/relatorios-bimestrais/:id` — atualizar
+  - `DELETE /api/relatorios-bimestrais/:id` — excluir
+  - `POST /api/relatorios-bimestrais/gerar` — gera texto via IA (Claude/Gemini) com prompt SEEDF/BNCC
+- **Web**: `artifacts/web/src/pages/relatorio-bimestral.tsx` + hook `use-relatorios-bimestrais.ts`
+  - Tela 1 (lista): seletor de bimestre + ano, filtro de turma, status por aluno (Não iniciado / Rascunho / Finalizado)
+  - Tela 2 (formulário): dados automáticos (faltas, aulas, atividades) + observações por disciplina (8 padrão + add/remove) + aspectos comportamentais/estratégias/síntese
+  - Tela 3 (preview): texto editável em textarea, botões Exportar PDF / Gerar Novamente / Salvar
+  - PDF: abre janela de impressão do navegador com HTML formatado
+- **Mobile**: `artifacts/mobile/app/(tabs)/relatorio-bimestral.tsx`
+  - Mesmo fluxo em React Native com expo-print para exportar PDF
+  - Registrado em `_layout.tsx` como tab oculta acessível via menu
+  - Adicionado card "Rel. Bimestral" no menu principal
+- **Prompt IA**: segue padrão SEEDF — abertura formal, bloco por disciplina, comportamental, estratégias, síntese. Linguagem pedagógica construtiva na 3ª pessoa.
+
 ## Packages
 
 ### `artifacts/api-server` (`@workspace/api-server`)
