@@ -272,16 +272,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const moveStudentToClass = useCallback(async (id: string, classId: string | null) => {
     if (!token) return;
     await withErrorHandling(async () => {
+      const oldClassId = students.find(s => s.id === id)?.classId ?? null;
       const student = await apiFetch<ApiStudent>(`/students/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ classId }),
         token,
       });
+      const newClassId = student.classId ?? null;
       setStudents(prev =>
-        prev.map(s => s.id === id ? { ...s, classId: student.classId ?? null } : s)
+        prev.map(s => s.id === id ? { ...s, classId: newClassId } : s)
       );
+      if (oldClassId !== newClassId) {
+        setClasses(prev => prev.map(c => {
+          if (c.id === oldClassId) return { ...c, studentCount: Math.max(0, c.studentCount - 1) };
+          if (c.id === newClassId) return { ...c, studentCount: c.studentCount + 1 };
+          return c;
+        }));
+      }
     });
-  }, [token, withErrorHandling]);
+  }, [token, students, withErrorHandling]);
 
   const toggleAttendance = useCallback(async (studentId: string, date: string) => {
     if (!token) return;
