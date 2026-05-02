@@ -134,6 +134,13 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
+        name="provas"
+        options={{
+          href: null,
+          title: "Provas",
+        }}
+      />
+      <Tabs.Screen
         name="sobre"
         options={{
           href: null,

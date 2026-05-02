@@ -52,6 +52,15 @@ const MENU_ITEMS = [
     bg: '#EDE9FE',
   },
   {
+    label: 'Provas',
+    icon: 'file-text',
+    lib: 'feather' as const,
+    description: 'Criar provas com IA',
+    route: '/provas',
+    color: '#7C3AED',
+    bg: '#EDE9FE',
+  },
+  {
     label: 'Relatórios',
     icon: 'bar-chart-2',
     lib: 'feather' as const,
