@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, teachersTable } from "@workspace/db";
+import type { PlanType } from "@workspace/db";
 import { eq, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
 
@@ -17,6 +18,13 @@ const PLAN_NAMES: Record<string, string> = {
   advanced: "PedagoDIA Avançado",
 };
 
+// Reverse lookup: map payment value back to planType for webhook activation
+const VALUE_TO_PLAN: Record<number, PlanType> = {
+  60: "basic",
+  80: "medium",
+  100: "advanced",
+};
+
 function getAsaasBaseUrl(): string {
   return process.env.ASAAS_ENV === "production"
     ? "https://api.asaas.com/v3"
@@ -29,7 +37,10 @@ function getAsaasApiKey(): string {
   return key;
 }
 
-async function asaasFetch(path: string, options: RequestInit = {}): Promise<Record<string, unknown>> {
+async function asaasFetch(
+  path: string,
+  options: RequestInit = {}
+): Promise<Record<string, unknown>> {
   const url = `${getAsaasBaseUrl()}${path}`;
   const res = await fetch(url, {
     ...options,
@@ -61,10 +72,13 @@ async function findOrCreateCustomer(
       await asaasFetch(`/customers/${existingCustomerId}`);
       return existingCustomerId;
     } catch {
+      // existing ID stale — fall through to search/create
     }
   }
 
-  const search = await asaasFetch(`/customers?email=${encodeURIComponent(email)}`);
+  const search = await asaasFetch(
+    `/customers?email=${encodeURIComponent(email)}`
+  );
   const searchData = search.data as Array<{ id: string }> | undefined;
   if (searchData && searchData.length > 0) {
     const customerId: string = searchData[0].id;
@@ -89,6 +103,13 @@ async function findOrCreateCustomer(
   return createdId;
 }
 
+/**
+ * POST /billing/subscribe
+ *
+ * Creates an Asaas subscription and returns the hosted payment link.
+ * Does NOT upgrade planType or planStatus — that only happens after
+ * PAYMENT_RECEIVED / PAYMENT_CONFIRMED webhook is received from Asaas.
+ */
 router.post("/billing/subscribe", requireAuth, async (req, res) => {
   try {
     const { planType } = req.body as { planType?: string };
@@ -136,15 +157,11 @@ router.post("/billing/subscribe", requireAuth, async (req, res) => {
     const subscriptionId = subscription.id as string;
     const paymentLink = (subscription.paymentLink as string | undefined) ?? null;
 
-    // Save Asaas IDs and the chosen planType now, but keep planStatus unchanged.
-    // The planType is stored so the webhook knows which tier to activate on confirmation.
-    // Premium access (planStatus=active) is only granted after PAYMENT_CONFIRMED webhook.
+    // Only save the Asaas subscription ID. planType and planStatus remain
+    // unchanged until a PAYMENT_RECEIVED / PAYMENT_CONFIRMED webhook arrives.
     await db
       .update(teachersTable)
-      .set({
-        asaasSubscriptionId: subscriptionId,
-        planType: planType as "basic" | "medium" | "advanced",
-      })
+      .set({ asaasSubscriptionId: subscriptionId })
       .where(eq(teachersTable.id, teacher.id));
 
     res.json({
@@ -161,10 +178,25 @@ router.post("/billing/subscribe", requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /webhooks/asaas
+ *
+ * Public endpoint — validates ASAAS_WEBHOOK_TOKEN (fails closed if missing).
+ * Updates plan state based on Asaas payment lifecycle events.
+ *
+ * On PAYMENT_RECEIVED / PAYMENT_CONFIRMED:
+ *   - Determines planType from payment value (60→basic, 80→medium, 100→advanced)
+ *   - Falls back to fetching subscription from Asaas API if value is not in payload
+ *   - Sets planType + planStatus=active + planExpirationDate=+30d atomically
+ *
+ * On PAYMENT_OVERDUE: sets planStatus=overdue
+ * On SUBSCRIPTION_DELETED / PAYMENT_DELETED: resets to free/canceled
+ */
 router.post("/webhooks/asaas", async (req, res) => {
   try {
     const token = process.env.ASAAS_WEBHOOK_TOKEN;
     if (!token) {
+      // Fail closed — webhook must be configured before it can receive events
       res.status(503).json({ error: "Webhook não configurado" });
       return;
     }
@@ -181,24 +213,22 @@ router.post("/webhooks/asaas", async (req, res) => {
       payment?: {
         customer?: string;
         subscription?: string;
+        value?: number;
       };
       subscription?: {
         id?: string;
         customer?: string;
+        value?: number;
       };
     };
 
     const eventType = event.event;
 
     const customerId =
-      event.payment?.customer ??
-      event.subscription?.customer ??
-      null;
+      event.payment?.customer ?? event.subscription?.customer ?? null;
 
     const subscriptionId =
-      event.payment?.subscription ??
-      event.subscription?.id ??
-      null;
+      event.payment?.subscription ?? event.subscription?.id ?? null;
 
     if (!customerId && !subscriptionId) {
       res.json({ received: true });
@@ -206,8 +236,10 @@ router.post("/webhooks/asaas", async (req, res) => {
     }
 
     const conditions = [];
-    if (customerId) conditions.push(eq(teachersTable.asaasCustomerId, customerId));
-    if (subscriptionId) conditions.push(eq(teachersTable.asaasSubscriptionId, subscriptionId));
+    if (customerId)
+      conditions.push(eq(teachersTable.asaasCustomerId, customerId));
+    if (subscriptionId)
+      conditions.push(eq(teachersTable.asaasSubscriptionId, subscriptionId));
 
     const [teacher] = await db
       .select()
@@ -223,11 +255,37 @@ router.post("/webhooks/asaas", async (req, res) => {
       eventType === "PAYMENT_RECEIVED" ||
       eventType === "PAYMENT_CONFIRMED"
     ) {
+      // Resolve planType from payment value in the webhook payload.
+      // If the value is present, map directly. Otherwise, fetch from Asaas API.
+      let paidPlanType: PlanType | null = null;
+
+      const paymentValue = event.payment?.value ?? event.subscription?.value;
+      if (paymentValue !== undefined) {
+        paidPlanType = VALUE_TO_PLAN[paymentValue] ?? null;
+      }
+
+      if (!paidPlanType && subscriptionId) {
+        try {
+          const sub = await asaasFetch(`/subscriptions/${subscriptionId}`);
+          const subValue = sub.value as number | undefined;
+          if (subValue !== undefined) {
+            paidPlanType = VALUE_TO_PLAN[subValue] ?? null;
+          }
+        } catch {
+          // best-effort — proceed with null
+        }
+      }
+
       const expiration = new Date();
       expiration.setDate(expiration.getDate() + 30);
+
       await db
         .update(teachersTable)
-        .set({ planStatus: "active", planExpirationDate: expiration })
+        .set({
+          ...(paidPlanType ? { planType: paidPlanType } : {}),
+          planStatus: "active",
+          planExpirationDate: expiration,
+        })
         .where(eq(teachersTable.id, teacher.id));
     } else if (eventType === "PAYMENT_OVERDUE") {
       await db
@@ -256,6 +314,12 @@ router.post("/webhooks/asaas", async (req, res) => {
   }
 });
 
+/**
+ * GET /billing/status
+ *
+ * Returns the authenticated teacher's current plan.
+ * Also auto-downgrades expired trials to free/active on read.
+ */
 router.get("/billing/status", requireAuth, async (req, res) => {
   try {
     const [teacher] = await db
@@ -289,7 +353,11 @@ router.get("/billing/status", requireAuth, async (req, res) => {
         .where(eq(teachersTable.id, req.teacherId!));
     }
 
-    res.json({ planType, planStatus, planExpirationDate: planExpirationDate ?? null });
+    res.json({
+      planType,
+      planStatus,
+      planExpirationDate: planExpirationDate ?? null,
+    });
   } catch (err) {
     req.log.error({ err }, "Error fetching billing status");
     res.status(500).json({ error: "Erro interno do servidor" });

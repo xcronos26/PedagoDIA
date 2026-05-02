@@ -1,0 +1,139 @@
+O que precisa ser construído
+Adicione uma nova seção chamada "Central de Provas" ao app. Essa seção permite que o professor crie, visualize e exporte provas valendo nota, com gabarito gerado automaticamente pela IA.
+
+Funcionalidades obrigatórias
+1. Página principal — Lista de provas
+
+Exibir todas as provas salvas do professor logado
+Cada card de prova mostra: título, disciplina, série/turma, número de questões, valor total e status (Rascunho / Ativa / Finalizada)
+Botão "+ Nova prova" que abre o fluxo de criação
+Botão de editar e exportar PDF em cada card
+
+
+2. Fluxo de criação de prova
+Passo 1 — Escolha da origem das questões
+O professor escolhe uma das três origens:
+A) Gerar com IA
+
+O professor informa: matéria, série/turma, tema/conteúdo e nível de dificuldade
+A IA gera questões inéditas com base nessas informações
+
+B) Baseado em atividades existentes
+
+Mostrar lista das atividades já criadas pelo professor no app (buscar do banco existente)
+O professor seleciona uma ou mais atividades
+A IA não copia as questões das atividades — ela usa o tema e o grau de dificuldade de cada atividade selecionada como referência para gerar questões novas e inéditas sobre o mesmo conteúdo e no mesmo nível
+
+C) Misto
+
+Combina as duas opções acima: professor seleciona atividades E informa temas adicionais
+A IA distribui as questões entre os conteúdos proporcionalmente
+
+Passo 2 — Configuração da prova
+
+Número de questões: 5, 8, 10, 15 ou 20
+Valor total da prova: campo numérico livre (ex: 10)
+Tipo de questão: múltipla escolha (4 alternativas A/B/C/D), dissertativa, ou misto
+Cálculo automático em tempo real: exibir "valor por questão = valor total ÷ número de questões"
+
+Passo 3 — Geração pela IA
+Chamar a API da Anthropic com o seguinte comportamento:
+Você é um assistente pedagógico especializado em criar avaliações escolares brasileiras.
+
+Gere uma prova com [N] questões de [TIPO] sobre [TEMA/CONTEÚDO] para [SÉRIE].
+Nível de dificuldade: [NÍVEL].
+[Se baseado em atividades]: Use os seguintes temas e níveis como referência — [LISTA DE TEMAS E NÍVEIS DAS ATIVIDADES]. Crie questões NOVAS e INÉDITAS sobre esses conteúdos, no mesmo grau de dificuldade. Não copie as atividades originais.
+
+Para cada questão retorne:
+- Enunciado claro e objetivo
+- 4 alternativas (A, B, C, D) se for múltipla escolha
+- A alternativa correta
+- O conteúdo/habilidade avaliada (ex: "adição de frações — nível básico")
+
+Responda APENAS em JSON, sem texto adicional, no formato:
+{
+  "questoes": [
+    {
+      "numero": 1,
+      "enunciado": "...",
+      "alternativas": { "A": "...", "B": "...", "C": "...", "D": "..." },
+      "resposta_correta": "A",
+      "descritivo": "..."
+    }
+  ]
+}
+
+Exibir estado de carregamento enquanto a IA processa
+Após a geração, mostrar prévia completa da prova antes de salvar
+
+Passo 4 — Prévia e confirmação
+
+Exibir todas as questões geradas
+Professor pode editar manualmente qualquer questão ou alternativa antes de salvar
+Exibir o gabarito logo abaixo das questões
+Botões: "Salvar prova" e "Gerar novamente"
+
+
+3. Estrutura de dados para salvar no banco
+Salvar a prova com os seguintes campos:
+provas:
+  - id
+  - professor_id
+  - titulo
+  - disciplina
+  - serie_turma
+  - tema
+  - numero_questoes
+  - valor_total
+  - valor_por_questao
+  - tipo_questao (multipla_escolha | dissertativa | misto)
+  - origem (ia | atividades | misto)
+  - atividades_base_ids (array, se aplicável)
+  - questoes (JSON com toda a prova)
+  - gabarito (JSON com as respostas corretas)
+  - status (rascunho | ativa | finalizada)
+  - criada_em
+  - atualizada_em
+
+4. Exportação em PDF
+Ao clicar em "Exportar PDF", gerar dois documentos em um único PDF:
+Folha 1 — Prova do aluno
+Cabeçalho com os seguintes campos (preencher com os dados salvos, deixar linha em branco para os que o aluno preenche):
+NOME DA ESCOLA (em maiúsculas, centralizado, negrito)
+[título da avaliação centralizado abaixo]
+────────────────────────────────────────
+Aluno(a): ________________________  Data: ____________
+Professora: ______________________  Série/Turma: ______
+Disciplina: _____________________  Nota: [  ]
+────────────────────────────────────────
+Seguido das questões numeradas com as alternativas. Cada questão mostra o valor em pontos no canto direito.
+Folha 2 — Gabarito (uso exclusivo do professor)
+Mesmo cabeçalho, mas com os dados já preenchidos (nome da professora, data, série/turma, disciplina). Título: "Gabarito — uso exclusivo do professor".
+Gabarito em grid: 1 — A | 2 — C | 3 — B ...
+Abaixo do gabarito: lista descritiva de cada questão com o conteúdo/habilidade avaliada.
+Implementação do PDF: usar a biblioteca jsPDF (já disponível via CDN ou npm). Para React/Next.js, instalar com npm install jspdf. Gerar o PDF inteiramente no frontend, sem backend.
+
+5. Navegação
+
+Adicionar "Provas" ou "Central de Provas" ao menu/sidebar já existente no app
+Usar o mesmo padrão visual (cores, fontes, componentes) já presente no app
+A seção de provas deve ser acessível apenas para o professor logado
+
+
+Regras importantes
+
+Não alterar nenhuma funcionalidade existente do app (planejamento semanal, geração de atividades, login, etc.)
+Reaproveitar os dados já existentes no banco: escola, professora, séries e turmas
+Manter o mesmo padrão visual do app atual
+Tratar erros da API da Anthropic com mensagem amigável ao usuário
+Salvar rascunho automaticamente ao sair do fluxo de criação sem finalizar
+
+
+Ordem de implementação sugerida
+
+Criar a estrutura de dados no banco (tabela/coleção de provas)
+Criar a página de listagem de provas
+Criar o fluxo de criação (3 passos) com a chamada à API da Anthropic
+Criar a prévia da prova com edição manual
+Implementar a exportação PDF com jsPDF
+Adicionar o link no menu do app
