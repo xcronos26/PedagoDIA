@@ -346,7 +346,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addActivity = useCallback(async (activity: Omit<Activity, 'id' | 'createdAt'>): Promise<Activity | undefined> => {
     if (!token) return undefined;
     let result: Activity | undefined;
-    await withErrorHandling(async () => {
+    try {
       const created = await apiFetch<ApiActivity>('/activities', {
         method: 'POST',
         body: JSON.stringify(activity),
@@ -357,9 +357,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         [...prev, mapped].sort((a, b) => b.date.localeCompare(a.date))
       );
       result = mapped;
-    });
+    } catch (e) {
+      const was401 = await handle401(e);
+      if (!was401) {
+        if ((e as ApiError)?.status === 403) {
+          throw e;
+        }
+        const msg = (e as ApiError)?.message ?? 'Ocorreu um erro. Tente novamente.';
+        Alert.alert('Erro', msg);
+      }
+    }
     return result;
-  }, [token, withErrorHandling]);
+  }, [token, handle401]);
 
   const updateActivity = useCallback(async (id: string, updates: Partial<Omit<Activity, 'id' | 'createdAt'>>) => {
     if (!token) return;

@@ -26,6 +26,9 @@ export interface Teacher {
   teacherType?: "regente" | "disciplina" | null;
   role?: TeacherRole;
   vinculo?: TeacherVinculo;
+  planType?: "free" | "basic" | "medium" | "advanced" | null;
+  planStatus?: "active" | "trial" | "overdue" | "canceled" | null;
+  planExpirationDate?: string | null;
 }
 
 interface AuthContextType {

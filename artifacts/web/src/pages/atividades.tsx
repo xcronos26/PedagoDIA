@@ -10,6 +10,7 @@ import { Plus, Book, FileText, Calendar as CalendarIcon, Link as LinkIcon, Trash
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useToast } from "@/hooks/use-toast";
+import { ApiError } from "@/lib/api";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -292,6 +293,16 @@ export default function Atividades() {
         onSuccess: () => {
           closeModal();
           toast({ title: "Atividade criada com sucesso!" });
+        },
+        onError: (err: Error) => {
+          const is403 = err instanceof ApiError && err.status === 403;
+          toast({
+            title: is403 ? "Limite do plano atingido" : "Erro ao criar atividade",
+            description: is403
+              ? err.message + " Acesse pedagodia.app/#planos para fazer upgrade."
+              : err.message,
+            variant: "destructive",
+          });
         },
       });
     }

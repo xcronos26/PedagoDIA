@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
   Share,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -167,6 +168,12 @@ export default function PlanningScreen() {
   const [savingDesc, setSavingDesc] = useState<Record<string, boolean>>({});
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
+
+  const hasAiAccess = teacher?.planType === 'advanced' || teacher?.planStatus === 'trial';
+  const _domain = process.env.EXPO_PUBLIC_DOMAIN;
+  const PLANS_URL = _domain ? `https://${_domain}/#planos` : 'https://pedagodia.app/#planos';
+
+  const [upgradeModal, setUpgradeModal] = useState(false);
 
   // AI plan state
   const [aiModal, setAiModal] = useState(false);
@@ -352,8 +359,21 @@ export default function PlanningScreen() {
       if (created) await handleLinkActivity(created.id);
       setCreateModal(false);
       setNewAct({ description: '', type: 'homework', subject: '' });
-    } catch {
-      Alert.alert('Erro', 'Não foi possível criar a atividade.');
+    } catch (err: unknown) {
+      const apiErr = err as { status?: number; message?: string };
+      if (apiErr?.status === 403) {
+        setCreateModal(false);
+        Alert.alert(
+          'Limite do plano atingido',
+          apiErr.message ?? 'Faça upgrade para criar mais atividades.',
+          [
+            { text: 'Ver planos', onPress: () => Linking.openURL(PLANS_URL) },
+            { text: 'Fechar', style: 'cancel' },
+          ]
+        );
+      } else {
+        Alert.alert('Erro', 'Não foi possível criar a atividade.');
+      }
     } finally {
       setCreatingAct(false);
     }
@@ -361,6 +381,10 @@ export default function PlanningScreen() {
 
   // ── AI PLAN ────────────────────────────────────────────────
   const openAiModal = (dateStr?: string) => {
+    if (!hasAiAccess) {
+      setUpgradeModal(true);
+      return;
+    }
     if (dateStr) {
       const tema = getTemaValue(dateStr);
       if (tema) setAiTema(tema);
@@ -526,6 +550,10 @@ export default function PlanningScreen() {
 
   // ── AI ACTIVITY ────────────────────────────────────────────
   const openAiActModal = (dateStr: string) => {
+    if (!hasAiAccess) {
+      setUpgradeModal(true);
+      return;
+    }
     setActiveDayDate(dateStr);
     setAiActResult(null);
     setAiActTema(getTemaValue(dateStr));
@@ -1115,6 +1143,32 @@ export default function PlanningScreen() {
         </TouchableOpacity>
       </Modal>
 
+      {/* ── Upgrade Modal ─────────────────────────────────── */}
+      <Modal visible={upgradeModal} transparent animationType="fade">
+        <TouchableOpacity style={modal.overlay} activeOpacity={1} onPress={() => setUpgradeModal(false)}>
+          <View style={upgrade.card} onStartShouldSetResponder={() => true}>
+            <View style={upgrade.iconWrap}>
+              <Ionicons name="crown" size={32} color="#f59e0b" />
+            </View>
+            <Text style={upgrade.title}>Plano Avançado</Text>
+            <Text style={upgrade.desc}>
+              A geração de planejamentos e atividades com IA está disponível no Plano Avançado (R$&nbsp;100/mês).
+            </Text>
+            <TouchableOpacity
+              style={upgrade.ctaBtn}
+              onPress={() => { setUpgradeModal(false); Linking.openURL(PLANS_URL); }}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="sparkles" size={16} color="#fff" />
+              <Text style={upgrade.ctaText}>Ver planos</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={upgrade.cancelBtn} onPress={() => setUpgradeModal(false)} activeOpacity={0.8}>
+              <Text style={upgrade.cancelText}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* ── AI Activity Modal ─────────────────────────────── */}
       <Modal visible={aiActModal} transparent animationType="slide">
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.38)' }}>
@@ -1389,6 +1443,40 @@ const modal = StyleSheet.create({
     backgroundColor: Colors.primary, alignItems: 'center',
   },
   confirmText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: '#fff' },
+});
+
+const upgrade = StyleSheet.create({
+  card: {
+    margin: 32, padding: 28, borderRadius: 24,
+    backgroundColor: Colors.surface,
+    alignItems: 'center', gap: 12,
+    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 16, elevation: 8,
+  },
+  iconWrap: {
+    width: 64, height: 64, borderRadius: 20,
+    backgroundColor: '#fef3c7', alignItems: 'center', justifyContent: 'center',
+    marginBottom: 4,
+  },
+  title: {
+    fontFamily: 'Inter_700Bold', fontSize: 20, color: Colors.text, textAlign: 'center',
+  },
+  desc: {
+    fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.textSecondary,
+    textAlign: 'center', lineHeight: 20,
+  },
+  ctaBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#7C3AED', borderRadius: 14,
+    paddingHorizontal: 24, paddingVertical: 13, marginTop: 8, width: '100%',
+    justifyContent: 'center',
+  },
+  ctaText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, color: '#fff' },
+  cancelBtn: {
+    paddingVertical: 10, width: '100%', alignItems: 'center',
+  },
+  cancelText: {
+    fontFamily: 'Inter_500Medium', fontSize: 14, color: Colors.textSecondary,
+  },
 });
 
 const ai = StyleSheet.create({

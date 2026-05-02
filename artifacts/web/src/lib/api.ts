@@ -1,6 +1,14 @@
 // Core API fetch wrapper that handles Auth tokens and 401s
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 export async function apiFetch<T = any>(
   path: string,
   options: RequestInit = {}
@@ -25,7 +33,7 @@ export async function apiFetch<T = any>(
     localStorage.removeItem('pedagogia_token');
     localStorage.removeItem('pedagogia_teacher');
     window.location.href = import.meta.env.BASE_URL + 'login';
-    throw new Error('Sessão expirada. Faça login novamente.');
+    throw new ApiError('Sessão expirada. Faça login novamente.', 401);
   }
 
   if (!response.ok) {
@@ -36,7 +44,7 @@ export async function apiFetch<T = any>(
     } catch {
       // ignore JSON parse error
     }
-    throw new Error(errorMsg);
+    throw new ApiError(errorMsg, response.status);
   }
 
   if (response.status === 204) {

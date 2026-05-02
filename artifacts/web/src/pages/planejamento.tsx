@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { format, parseISO, startOfMonth, endOfMonth, eachWeekOfInterval, endOfWeek, eachDayOfInterval, isSameMonth, isToday, addMonths, subMonths, addDays, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, CalendarDays, BookOpen, Plus, X, Save, Loader2, Sparkles, Wand2, Brain, Copy, Check } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, BookOpen, Plus, X, Save, Loader2, Sparkles, Wand2, Brain, Copy, Check, Crown } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useLessonPlans, useUpsertLessonPlan, useLinkActivity, useUnlinkActivity, type LessonPlan } from "@/hooks/use-lesson-plans";
 import { useActivities, useCreateActivity, type Activity } from "@/hooks/use-activities";
 import { useSubjects } from "@/hooks/use-subjects";
 import { useToast } from "@/hooks/use-toast";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 
 function cn(...inputs: ClassValue[]) {
@@ -240,8 +240,12 @@ export default function Planejamento() {
       setCreatingActivity(false);
       setNewActivity({ subject: '', type: 'homework', description: '', link: '' });
       toast({ title: "Atividade criada e associada!" });
-    } catch {
-      toast({ title: "Erro ao criar atividade", variant: "destructive" });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) {
+        toast({ title: "Limite do plano atingido", description: err.message, variant: "destructive" });
+      } else {
+        toast({ title: "Erro ao criar atividade", variant: "destructive" });
+      }
     } finally {
       setSaving(false);
     }
@@ -415,6 +419,9 @@ export default function Planejamento() {
     setLinkingActivity(false);
   };
 
+  const hasAiAccess = user?.planType === 'advanced' || user?.planStatus === 'trial';
+  const PLANS_URL = '/#planos';
+
   const isDayPlan = aiPlanResult && !("semana" in aiPlanResult);
   const isWeekPlan = aiPlanResult && "semana" in aiPlanResult;
 
@@ -569,13 +576,27 @@ export default function Planejamento() {
                   {selectedPlan ? "Planejamento existente — edite e salve" : "Nenhum planejamento para este dia"}
                 </p>
               </div>
-              <button
-                onClick={openAiPlanModal}
-                className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl font-semibold text-sm shadow-md shadow-purple-500/20 hover:shadow-lg hover:-translate-y-0.5 transition-all"
-              >
-                <Sparkles className="w-4 h-4" />
-                Gerar com IA
-              </button>
+              {hasAiAccess ? (
+                <button
+                  onClick={openAiPlanModal}
+                  className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl font-semibold text-sm shadow-md shadow-purple-500/20 hover:shadow-lg hover:-translate-y-0.5 transition-all"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Gerar com IA
+                </button>
+              ) : (
+                <a
+                  href={PLANS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 bg-muted/60 text-muted-foreground rounded-xl font-semibold text-sm border border-border/50 hover:bg-muted/80 transition-all"
+                  title="Disponível no Plano Avançado"
+                >
+                  <Crown className="w-4 h-4 text-amber-500" />
+                  Gerar com IA
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500 border border-amber-400/40 rounded px-1.5 py-0.5 bg-amber-50 dark:bg-amber-950/30">Avançado</span>
+                </a>
+              )}
             </div>
 
             {/* Plan card */}
@@ -681,12 +702,24 @@ export default function Planejamento() {
                   >
                     <Plus className="w-3.5 h-3.5" /> Associar
                   </button>
-                  <button
-                    onClick={() => { setAiActivityResult(null); setAiActivityDisciplina(""); setAiActivityTema(tema || ""); setAiActivityModal(true); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-sm hover:shadow-md transition-all"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" /> Gerar com IA
-                  </button>
+                  {hasAiAccess ? (
+                    <button
+                      onClick={() => { setAiActivityResult(null); setAiActivityDisciplina(""); setAiActivityTema(tema || ""); setAiActivityModal(true); }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-sm hover:shadow-md transition-all"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" /> Gerar com IA
+                    </button>
+                  ) : (
+                    <a
+                      href={PLANS_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-muted/50 text-muted-foreground border border-border/40 hover:bg-muted/70 transition-all"
+                      title="Disponível no Plano Avançado"
+                    >
+                      <Crown className="w-3.5 h-3.5 text-amber-500" /> Gerar com IA <span className="text-amber-500">↗</span>
+                    </a>
+                  )}
                   <button
                     onClick={() => { setCreatingActivity(c => !c); setLinkingActivity(false); }}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-colors"

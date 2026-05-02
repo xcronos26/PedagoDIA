@@ -25,6 +25,9 @@ export type Teacher = {
   name: string;
   email: string;
   weeklySchedule?: WeeklySchedule | null;
+  planType?: "free" | "basic" | "medium" | "advanced" | null;
+  planStatus?: "active" | "trial" | "overdue" | "canceled" | null;
+  planExpirationDate?: string | null;
 };
 
 interface AuthContextValue {

@@ -16,6 +16,7 @@ import {
   Users,
   Package,
   Check,
+  Loader2,
 } from "lucide-react";
 
 const fadeUp: Variants = {
@@ -27,6 +28,212 @@ const stagger: Variants = {
   hidden: {},
   show: { transition: { staggerChildren: 0.12 } },
 };
+
+const LANDING_API_BASE = '/api';
+
+async function landingApiFetch<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = localStorage.getItem('pedagogia_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${LANDING_API_BASE}${path}`, { ...options, headers });
+  const data = await res.json();
+  if (!res.ok) throw Object.assign(new Error(data.error ?? 'Erro'), { status: res.status });
+  return data as T;
+}
+
+function PricingSection() {
+  const [subscribing, setSubscribing] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubscribe = async (planType: 'basic' | 'medium' | 'advanced') => {
+    setError(null);
+    const token = localStorage.getItem('pedagogia_token');
+    if (!token) {
+      window.location.href = '/web/login';
+      return;
+    }
+    setSubscribing(planType);
+    try {
+      const data = await landingApiFetch<{ paymentLink?: string }>('/billing/subscribe', {
+        method: 'POST',
+        body: JSON.stringify({ planType }),
+      });
+      if (data.paymentLink) {
+        window.location.href = data.paymentLink;
+      } else {
+        setError('Link de pagamento não disponível. Tente novamente.');
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erro ao criar assinatura');
+    } finally {
+      setSubscribing(null);
+    }
+  };
+
+  const plans = [
+    {
+      id: 'free' as const,
+      tier: 'Gratuito',
+      name: 'Free',
+      price: null,
+      color: '#a78bfa',
+      features: [
+        'Chamada digital',
+        'Planejamento de aulas',
+        'Criação de atividades',
+        'Relatório por aluno',
+        '1 turma · 15 alunos · 15 atividades',
+      ],
+      cta: 'Começar grátis',
+      ctaLink: '/web/',
+      highlight: false,
+    },
+    {
+      id: 'basic' as const,
+      tier: 'Básico',
+      name: 'R$\u00a060',
+      price: 60,
+      color: '#a78bfa',
+      features: [
+        'Tudo do plano Free',
+        'Turmas ilimitadas',
+        'Alunos ilimitados',
+        'Atividades ilimitadas',
+        'Planejamento semanal completo',
+      ],
+      cta: 'Assinar',
+      highlight: false,
+    },
+    {
+      id: 'medium' as const,
+      tier: 'Médio',
+      name: 'R$\u00a080',
+      price: 80,
+      color: '#FBBF24',
+      features: [
+        'Tudo do plano Básico',
+        'Relatório para os pais',
+        'Compartilhamento individual por aluno',
+        'Link único por responsável',
+      ],
+      cta: 'Assinar',
+      highlight: true,
+    },
+    {
+      id: 'advanced' as const,
+      tier: 'Avançado',
+      name: 'R$\u00a0100',
+      price: 100,
+      color: '#fb923c',
+      features: [
+        'Tudo do plano Médio',
+        'Planejamento semanal com IA',
+        'Planejamento diário com IA',
+        'Geração de atividades com IA',
+      ],
+      cta: 'Assinar',
+      highlight: false,
+    },
+  ];
+
+  return (
+    <section className="py-24 bg-[#1E1B4B]" id="planos">
+      <div className="container mx-auto px-4 md:px-6">
+        <motion.div
+          initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }}
+          variants={stagger} className="text-center mb-16"
+        >
+          <motion.p variants={fadeUp} className="text-[#FBBF24] font-semibold text-sm uppercase tracking-widest mb-3">
+            Planos
+          </motion.p>
+          <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-bold text-white">
+            Escolha o plano ideal para você
+          </motion.h2>
+          <motion.p variants={fadeUp} className="text-white/60 text-lg mt-4 max-w-xl mx-auto">
+            Mensalidade simples, sem fidelidade. Cancele quando quiser.
+          </motion.p>
+        </motion.div>
+
+        {error && (
+          <div className="max-w-md mx-auto mb-8 px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-300 text-sm text-center">
+            {error}
+          </div>
+        )}
+
+        <motion.div
+          initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }}
+          variants={stagger}
+          className="grid md:grid-cols-4 gap-6 max-w-6xl mx-auto items-start"
+        >
+          {plans.map((plan) => (
+            <motion.div
+              key={plan.id}
+              variants={fadeUp}
+              className={
+                plan.highlight
+                  ? "relative bg-[#7C3AED] rounded-3xl p-8 flex flex-col shadow-2xl shadow-purple-900/50 ring-2 ring-[#FBBF24]"
+                  : "bg-white/5 border border-white/15 rounded-3xl p-8 flex flex-col"
+              }
+            >
+              {plan.highlight && (
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                  <span className="bg-[#FBBF24] text-[#1E1B4B] text-xs font-black px-4 py-1.5 rounded-full uppercase tracking-wide">
+                    Mais popular
+                  </span>
+                </div>
+              )}
+              <div className="mb-6">
+                <p className="text-sm font-bold uppercase tracking-widest mb-2" style={{ color: plan.highlight ? '#fef08a' : plan.color }}>
+                  {plan.tier}
+                </p>
+                <div className="flex items-end gap-1 mt-4">
+                  {plan.price === null ? (
+                    <span className="text-4xl font-extrabold text-white">Grátis</span>
+                  ) : (
+                    <>
+                      <span className="text-4xl font-extrabold text-white">{plan.name}</span>
+                      <span className={`mb-1 ${plan.highlight ? 'text-white/60' : 'text-white/50'}`}>/mês</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              <ul className="space-y-3 mb-8 flex-1">
+                {plan.features.map((item) => (
+                  <li key={item} className={`flex items-start gap-3 text-sm ${plan.highlight ? 'text-white/90' : 'text-white/75'}`}>
+                    <Check className="w-4 h-4 shrink-0 mt-0.5" style={{ color: plan.highlight ? '#FBBF24' : plan.color }} />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              {plan.id === 'free' ? (
+                <a href={plan.ctaLink} data-testid="link-plan-free">
+                  <Button className="w-full bg-white/10 hover:bg-white/20 text-white font-bold border border-white/20">
+                    {plan.cta}
+                  </Button>
+                </a>
+              ) : (
+                <Button
+                  data-testid={`btn-subscribe-${plan.id}`}
+                  disabled={subscribing === plan.id}
+                  onClick={() => handleSubscribe(plan.id as 'basic' | 'medium' | 'advanced')}
+                  className={
+                    plan.highlight
+                      ? "w-full bg-[#FBBF24] hover:bg-[#f59e0b] text-[#1E1B4B] font-bold border-0"
+                      : "w-full bg-white/10 hover:bg-white/20 text-white font-bold border border-white/20"
+                  }
+                >
+                  {subscribing === plan.id ? (
+                    <><Loader2 className="w-4 h-4 animate-spin mr-2" />Aguarde...</>
+                  ) : plan.cta}
+                </Button>
+              )}
+            </motion.div>
+          ))}
+        </motion.div>
+      </div>
+    </section>
+  );
+}
 
 const heroScreenshots = [
   { src: "/screenshots/chamada.jpeg", alt: "Tela de Chamada" },
@@ -358,135 +565,7 @@ export default function Home() {
       </section>
 
       {/* ───────── PLANOS DE ASSINATURA ───────── */}
-      <section className="py-24 bg-[#1E1B4B]">
-        <div className="container mx-auto px-4 md:px-6">
-          <motion.div
-            initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }}
-            variants={stagger} className="text-center mb-16"
-          >
-            <motion.p variants={fadeUp} className="text-[#FBBF24] font-semibold text-sm uppercase tracking-widest mb-3">
-              Planos
-            </motion.p>
-            <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-bold text-white">
-              Escolha o plano ideal para você
-            </motion.h2>
-            <motion.p variants={fadeUp} className="text-white/60 text-lg mt-4 max-w-xl mx-auto">
-              Mensalidade simples, sem fidelidade. Cancele quando quiser.
-            </motion.p>
-          </motion.div>
-
-          <motion.div
-            initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }}
-            variants={stagger}
-            className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto items-start"
-          >
-            {/* Plano Libâneo */}
-            <motion.div
-              variants={fadeUp}
-              className="bg-white/5 border border-white/15 rounded-3xl p-8 flex flex-col"
-            >
-              <div className="mb-6">
-                <p className="text-[#a78bfa] text-sm font-bold uppercase tracking-widest mb-2">Básico</p>
-                <h3 className="text-2xl font-black text-white mb-1">Libâneo</h3>
-                <div className="flex items-end gap-1 mt-4">
-                  <span className="text-4xl font-extrabold text-white">R$&nbsp;20</span>
-                  <span className="text-white/50 mb-1">/mês</span>
-                </div>
-              </div>
-              <ul className="space-y-3 mb-8 flex-1">
-                {[
-                  "Chamada",
-                  "Criação de atividades",
-                  "Planejamento semanal",
-                  "Relatório por aluno",
-                  "Gerenciamento de turmas e alunos",
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-3 text-white/75 text-sm">
-                    <Check className="w-4 h-4 text-[#a78bfa] shrink-0 mt-0.5" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <a href="/web/" data-testid="link-plan-libaneo">
-                <Button className="w-full bg-white/10 hover:bg-white/20 text-white font-bold border border-white/20">
-                  Começar agora
-                </Button>
-              </a>
-            </motion.div>
-
-            {/* Plano Saviani — destaque */}
-            <motion.div
-              variants={fadeUp}
-              className="relative bg-[#7C3AED] rounded-3xl p-8 flex flex-col shadow-2xl shadow-purple-900/50 ring-2 ring-[#FBBF24]"
-            >
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                <span className="bg-[#FBBF24] text-[#1E1B4B] text-xs font-black px-4 py-1.5 rounded-full uppercase tracking-wide">
-                  Mais popular
-                </span>
-              </div>
-              <div className="mb-6">
-                <p className="text-yellow-200 text-sm font-bold uppercase tracking-widest mb-2">Médio</p>
-                <h3 className="text-2xl font-black text-white mb-1">Saviani</h3>
-                <div className="flex items-end gap-1 mt-4">
-                  <span className="text-4xl font-extrabold text-white">R$&nbsp;60</span>
-                  <span className="text-white/60 mb-1">/mês</span>
-                </div>
-              </div>
-              <ul className="space-y-3 mb-8 flex-1">
-                {[
-                  "Tudo do plano Libâneo",
-                  "Relatório para os pais",
-                  "Compartilhamento individual por aluno",
-                  "Link único por responsável",
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-3 text-white/90 text-sm">
-                    <Check className="w-4 h-4 text-[#FBBF24] shrink-0 mt-0.5" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <a href="/web/" data-testid="link-plan-saviani">
-                <Button className="w-full bg-[#FBBF24] hover:bg-[#f59e0b] text-[#1E1B4B] font-bold border-0">
-                  Escolher Saviani
-                </Button>
-              </a>
-            </motion.div>
-
-            {/* Plano Freire */}
-            <motion.div
-              variants={fadeUp}
-              className="bg-white/5 border border-white/15 rounded-3xl p-8 flex flex-col"
-            >
-              <div className="mb-6">
-                <p className="text-[#fb923c] text-sm font-bold uppercase tracking-widest mb-2">Completo</p>
-                <h3 className="text-2xl font-black text-white mb-1">Freire</h3>
-                <div className="flex items-end gap-1 mt-4">
-                  <span className="text-4xl font-extrabold text-white">R$&nbsp;100</span>
-                  <span className="text-white/50 mb-1">/mês</span>
-                </div>
-              </div>
-              <ul className="space-y-3 mb-8 flex-1">
-                {[
-                  "Tudo do plano Saviani",
-                  "Planejamento semanal com IA",
-                  "Planejamento diário com IA",
-                  "Sugestões personalizadas por turma",
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-3 text-white/75 text-sm">
-                    <Check className="w-4 h-4 text-[#fb923c] shrink-0 mt-0.5" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <a href="/web/" data-testid="link-plan-freire">
-                <Button className="w-full bg-white/10 hover:bg-white/20 text-white font-bold border border-white/20">
-                  Escolher Freire
-                </Button>
-              </a>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
+      <PricingSection />
 
       {/* ───────── POR QUE SOMOS DIFERENTES? ───────── */}
       <section className="py-24 bg-[#7C3AED]/10">
