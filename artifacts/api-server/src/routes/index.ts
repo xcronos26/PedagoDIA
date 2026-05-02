@@ -16,6 +16,7 @@ import examsRouter from "./exams";
 import adminRouter from "./admin";
 import schoolsRouter from "./schools";
 import escolaRouter from "./escola";
+import questionsRouter from "./questions";
 
 const router: IRouter = Router();
 
@@ -36,5 +37,6 @@ router.use(examsRouter);
 router.use(adminRouter);
 router.use(schoolsRouter);
 router.use(escolaRouter);
+router.use(questionsRouter);
 
 export default router;

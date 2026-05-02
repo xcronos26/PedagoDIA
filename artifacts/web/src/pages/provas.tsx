@@ -1,5 +1,9 @@
-import React, { useState, useCallback } from "react";
-import { FileText, Plus, Trash2, Edit2, Download, ChevronLeft, ChevronRight, Loader2, RefreshCw, BookOpen, Sparkles, Layers, Check, X } from "lucide-react";
+import React, { useState, useCallback, useMemo } from "react";
+import {
+  FileText, Plus, Trash2, Edit2, Download, ChevronLeft, ChevronRight,
+  Loader2, RefreshCw, BookOpen, Sparkles, Layers, Check, X,
+  Library, Search, Tag, BookMarked, Filter,
+} from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +22,14 @@ import {
   type OrigemProva,
   type StatusProva,
 } from "@/hooks/use-exams";
+import {
+  useQuestions,
+  useCreateQuestion,
+  useBulkSaveQuestions,
+  useDeleteQuestion,
+  type Question,
+  type CreateQuestionInput,
+} from "@/hooks/use-questions";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -70,7 +82,6 @@ async function exportPDF(exam: Exam, professoraNome: string) {
   };
 
   const renderProvaPage = (isGabarito: boolean) => {
-    // Header
     if (exam.nomeEscola) {
       addLine(exam.nomeEscola.toUpperCase(), 13, true, "center");
       y += 2;
@@ -79,7 +90,6 @@ async function exportPDF(exam: Exam, professoraNome: string) {
     y += 3;
     addSeparator();
 
-    // Aluno fields
     if (!isGabarito) {
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
@@ -108,7 +118,6 @@ async function exportPDF(exam: Exam, professoraNome: string) {
     const vpq = parseFloat(exam.valorPorQuestao).toFixed(2).replace(".", ",");
 
     if (isGabarito) {
-      // Gabarito grid
       addLine("Gabarito:", 11, true);
       y += 2;
       const cols = 5;
@@ -127,7 +136,6 @@ async function exportPDF(exam: Exam, professoraNome: string) {
       y += 12;
       addSeparator();
 
-      // Descriptives
       addLine("Habilidades avaliadas:", 11, true);
       y += 3;
       exam.questoes.forEach((q) => {
@@ -141,10 +149,8 @@ async function exportPDF(exam: Exam, professoraNome: string) {
         y += lines.length * 5 + 3;
       });
     } else {
-      // Questões
       exam.questoes.forEach((q, idx) => {
         checkPage(30);
-        // Question header
         doc.setFontSize(11);
         doc.setFont("helvetica", "bold");
         doc.text(`${q.numero}.`, margin, y);
@@ -152,7 +158,6 @@ async function exportPDF(exam: Exam, professoraNome: string) {
         const enunciadoLines = doc.splitTextToSize(q.enunciado, contentW - 10) as string[];
         doc.text(enunciadoLines, margin + 7, y);
 
-        // Value at right
         doc.setFontSize(9);
         doc.setTextColor("#666666");
         doc.text(`(${vpq} pts)`, pageW - margin, y, { align: "right" });
@@ -174,7 +179,6 @@ async function exportPDF(exam: Exam, professoraNome: string) {
           });
           y += 4;
         } else {
-          // Dissertativa — space for answer
           y += 2;
           for (let i = 0; i < 4; i++) {
             doc.setDrawColor("#cccccc");
@@ -287,9 +291,473 @@ function ExamCard({
   );
 }
 
+// ── Banco Picker (used inside wizard) ────────────────────────────────────────
+
+function BancoPicker({
+  onConfirm,
+  onCancel,
+  disciplinaHint,
+}: {
+  onConfirm: (questoes: Questao[]) => void;
+  onCancel: () => void;
+  disciplinaHint?: string;
+}) {
+  const { data: questions = [], isLoading } = useQuestions();
+  const [search, setSearch] = useState("");
+  const [filterDisciplina, setFilterDisciplina] = useState(disciplinaHint ?? "");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const disciplinas = useMemo(() => {
+    const set = new Set(questions.map((q) => q.disciplina).filter(Boolean));
+    return Array.from(set).sort();
+  }, [questions]);
+
+  const filtered = useMemo(() => {
+    const s = search.toLowerCase();
+    return questions.filter((q) => {
+      const matchSearch = !s || q.enunciado.toLowerCase().includes(s) || q.disciplina.toLowerCase().includes(s);
+      const matchDisc = !filterDisciplina || q.disciplina === filterDisciplina;
+      return matchSearch && matchDisc;
+    });
+  }, [questions, search, filterDisciplina]);
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleConfirm = () => {
+    const picked = questions.filter((q) => selected.has(q.id));
+    const questoes: Questao[] = picked.map((q, i) => ({
+      numero: i + 1,
+      enunciado: q.enunciado,
+      alternativas: q.alternativas ?? undefined,
+      resposta_correta: q.resposta_correta ?? undefined,
+      descritivo: q.descritivo,
+    }));
+    onConfirm(questoes);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            className="w-full pl-9 pr-3 py-2 text-sm border border-border/60 rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+            placeholder="Buscar questões..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        {disciplinas.length > 0 && (
+          <select
+            className="text-sm border border-border/60 rounded-xl px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+            value={filterDisciplina}
+            onChange={(e) => setFilterDisciplina(e.target.value)}
+          >
+            <option value="">Todas disciplinas</option>
+            {disciplinas.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center gap-3">
+          <Library className="w-10 h-10 text-muted-foreground/40" />
+          <p className="text-sm text-muted-foreground">
+            {questions.length === 0
+              ? "Seu banco de questões está vazio. Salve questões de provas anteriores para reutilizá-las aqui."
+              : "Nenhuma questão encontrada com esses filtros."}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+          {filtered.map((q) => {
+            const sel = selected.has(q.id);
+            return (
+              <button
+                key={q.id}
+                onClick={() => toggle(q.id)}
+                className={cn(
+                  "w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all",
+                  sel ? "border-primary bg-primary/5" : "border-border/60 hover:border-primary/30"
+                )}
+              >
+                <div className={cn(
+                  "w-5 h-5 rounded flex items-center justify-center border shrink-0 mt-0.5",
+                  sel ? "bg-primary border-primary" : "border-border"
+                )}>
+                  {sel && <Check className="w-3 h-3 text-white" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium line-clamp-2">{q.enunciado}</p>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    {q.disciplina && <span className="text-xs text-muted-foreground">{q.disciplina}</span>}
+                    {q.serieTurma && <span className="text-xs text-muted-foreground">· {q.serieTurma}</span>}
+                    <span className={cn(
+                      "text-xs px-1.5 py-0.5 rounded-full",
+                      q.tipoQuestao === "multipla_escolha"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-orange-100 text-orange-700"
+                    )}>
+                      {q.tipoQuestao === "multipla_escolha" ? "M.E." : "Dissertativa"}
+                    </span>
+                    {q.tags?.map((t) => (
+                      <span key={t} className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">{t}</span>
+                    ))}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between pt-2 border-t border-border/40">
+        <button
+          onClick={onCancel}
+          className="px-4 py-2 rounded-xl border border-border hover:bg-muted text-sm font-semibold transition-colors"
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={handleConfirm}
+          disabled={selected.size === 0}
+          className={cn(
+            "flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold transition-all",
+            selected.size > 0
+              ? "bg-primary text-white hover:bg-primary/90"
+              : "bg-muted text-muted-foreground cursor-not-allowed"
+          )}
+        >
+          <Check className="w-4 h-4" />
+          Usar {selected.size > 0 ? `${selected.size} questão${selected.size !== 1 ? "ões" : ""}` : "questões"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Add Question Modal ────────────────────────────────────────────────────────
+
+function AddQuestionModal({ onClose }: { onClose: () => void }) {
+  const [enunciado, setEnunciado] = useState("");
+  const [disciplina, setDisciplina] = useState("");
+  const [serieTurma, setSerieTurma] = useState("");
+  const [tipo, setTipo] = useState<"multipla_escolha" | "dissertativa">("multipla_escolha");
+  const [alts, setAlts] = useState({ A: "", B: "", C: "", D: "" });
+  const [respostaCorreta, setRespostaCorreta] = useState("");
+  const [descritivo, setDescritivo] = useState("");
+  const [tagsInput, setTagsInput] = useState("");
+  const { mutate: createQuestion, isPending } = useCreateQuestion();
+  const { toast } = useToast();
+
+  const handleSave = () => {
+    if (!enunciado.trim()) {
+      toast({ title: "Enunciado é obrigatório", variant: "destructive" });
+      return;
+    }
+    const tags = tagsInput.split(",").map((t) => t.trim()).filter(Boolean);
+    const payload: CreateQuestionInput = {
+      enunciado: enunciado.trim(),
+      disciplina,
+      serieTurma,
+      tipoQuestao: tipo,
+      descritivo,
+      tags,
+      ...(tipo === "multipla_escolha"
+        ? { alternativas: alts, resposta_correta: respostaCorreta || null }
+        : { alternativas: null, resposta_correta: null }),
+    };
+    createQuestion(payload, {
+      onSuccess: () => {
+        toast({ title: "Questão salva no banco!" });
+        onClose();
+      },
+      onError: () => toast({ title: "Erro ao salvar questão.", variant: "destructive" }),
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-background rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-6 border-b border-border/50">
+          <h2 className="font-display font-bold text-xl">Adicionar questão ao banco</h2>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-muted transition-colors">
+            <X className="w-5 h-5 text-muted-foreground" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div>
+            <label className="text-sm font-semibold text-foreground mb-1 block">Enunciado *</label>
+            <textarea
+              className="w-full text-sm bg-background border border-border/60 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+              rows={3}
+              placeholder="Digite o enunciado da questão..."
+              value={enunciado}
+              onChange={(e) => setEnunciado(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-semibold text-foreground mb-1 block">Disciplina</label>
+              <input
+                className="w-full text-sm bg-background border border-border/60 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                placeholder="Ex: Matemática"
+                value={disciplina}
+                onChange={(e) => setDisciplina(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-foreground mb-1 block">Série/Turma</label>
+              <input
+                className="w-full text-sm bg-background border border-border/60 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                placeholder="Ex: 5º Ano A"
+                value={serieTurma}
+                onChange={(e) => setSerieTurma(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold text-foreground mb-2 block">Tipo de questão</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(["multipla_escolha", "dissertativa"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTipo(t)}
+                  className={cn(
+                    "p-3 rounded-xl border-2 text-sm font-semibold transition-all",
+                    tipo === t ? "border-primary bg-primary/5 text-primary" : "border-border/60 hover:border-primary/40"
+                  )}
+                >
+                  {t === "multipla_escolha" ? "Múltipla Escolha" : "Dissertativa"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {tipo === "multipla_escolha" && (
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground block">Alternativas</label>
+              {(["A", "B", "C", "D"] as const).map((letter) => (
+                <div key={letter} className="flex items-center gap-2">
+                  <button
+                    onClick={() => setRespostaCorreta(letter)}
+                    className={cn(
+                      "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-colors",
+                      respostaCorreta === letter ? "bg-green-500 text-white" : "bg-muted text-muted-foreground hover:bg-green-100"
+                    )}
+                    title="Marcar como correta"
+                  >
+                    {letter}
+                  </button>
+                  <input
+                    className="flex-1 text-sm bg-background border border-border/60 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    placeholder={`Alternativa ${letter}`}
+                    value={alts[letter]}
+                    onChange={(e) => setAlts((prev) => ({ ...prev, [letter]: e.target.value }))}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div>
+            <label className="text-sm font-semibold text-foreground mb-1 block">Habilidade avaliada</label>
+            <input
+              className="w-full text-sm bg-background border border-border/60 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              placeholder="Ex: Interpretar dados em tabelas"
+              value={descritivo}
+              onChange={(e) => setDescritivo(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold text-foreground mb-1 block">Tags (separadas por vírgula)</label>
+            <input
+              className="w-full text-sm bg-background border border-border/60 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              placeholder="Ex: frações, 3º bimestre"
+              value={tagsInput}
+              onChange={(e) => setTagsInput(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-border/50">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl border border-border hover:bg-muted text-sm font-semibold transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isPending || !enunciado.trim()}
+            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            Salvar no banco
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Question Bank Tab ─────────────────────────────────────────────────────────
+
+function QuestionBankTab() {
+  const { data: questions = [], isLoading } = useQuestions();
+  const { mutate: deleteQuestion } = useDeleteQuestion();
+  const { toast } = useToast();
+  const [search, setSearch] = useState("");
+  const [filterDisciplina, setFilterDisciplina] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  const disciplinas = useMemo(() => {
+    const set = new Set(questions.map((q) => q.disciplina).filter(Boolean));
+    return Array.from(set).sort();
+  }, [questions]);
+
+  const filtered = useMemo(() => {
+    const s = search.toLowerCase();
+    return questions.filter((q) => {
+      const matchSearch = !s || q.enunciado.toLowerCase().includes(s) || q.disciplina.toLowerCase().includes(s) || q.tags?.some((t) => t.toLowerCase().includes(s));
+      const matchDisc = !filterDisciplina || q.disciplina === filterDisciplina;
+      return matchSearch && matchDisc;
+    });
+  }, [questions, search, filterDisciplina]);
+
+  const handleDelete = (q: Question) => {
+    if (!confirm("Remover esta questão do banco?")) return;
+    deleteQuestion(q.id, {
+      onSuccess: () => toast({ title: "Questão removida." }),
+      onError: () => toast({ title: "Erro ao remover.", variant: "destructive" }),
+    });
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-sm text-muted-foreground">
+          {isLoading ? "Carregando..." : `${questions.length} questão${questions.length !== 1 ? "ões" : ""} salva${questions.length !== 1 ? "s" : ""}`}
+        </p>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all"
+        >
+          <Plus className="w-4 h-4" />
+          Adicionar questão
+        </button>
+      </div>
+
+      <div className="flex gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-48">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            className="w-full pl-9 pr-3 py-2 text-sm border border-border/60 rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+            placeholder="Buscar por enunciado, disciplina ou tag..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        {disciplinas.length > 0 && (
+          <select
+            className="text-sm border border-border/60 rounded-xl px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+            value={filterDisciplina}
+            onChange={(e) => setFilterDisciplina(e.target.value)}
+          >
+            <option value="">Todas disciplinas</option>
+            {disciplinas.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-7 h-7 animate-spin text-primary" />
+        </div>
+      ) : questions.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
+          <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+            <Library className="w-10 h-10 text-primary" />
+          </div>
+          <h3 className="font-display font-bold text-xl">Banco vazio</h3>
+          <p className="text-muted-foreground max-w-sm text-sm">
+            Salve questões de provas geradas pela IA ou adicione manualmente para reutilizá-las em novas avaliações.
+          </p>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-2xl font-semibold text-sm hover:bg-primary/90 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            Adicionar primeira questão
+          </button>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center gap-3">
+          <Search className="w-8 h-8 text-muted-foreground/40" />
+          <p className="text-sm text-muted-foreground">Nenhuma questão encontrada com esses filtros.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-3">
+          {filtered.map((q) => (
+            <div key={q.id} className="bg-card border border-border/50 rounded-2xl p-4 flex items-start gap-3 hover:shadow-sm transition-all">
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <p className="text-sm font-medium text-foreground line-clamp-3">{q.enunciado}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={cn(
+                    "text-xs px-2 py-0.5 rounded-full font-semibold",
+                    q.tipoQuestao === "multipla_escolha" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"
+                  )}>
+                    {q.tipoQuestao === "multipla_escolha" ? "Múltipla Escolha" : "Dissertativa"}
+                  </span>
+                  {q.disciplina && <span className="text-xs text-muted-foreground">{q.disciplina}</span>}
+                  {q.serieTurma && <span className="text-xs text-muted-foreground">· {q.serieTurma}</span>}
+                  {q.tags?.map((t) => (
+                    <span key={t} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Tag className="w-2.5 h-2.5" />{t}
+                    </span>
+                  ))}
+                </div>
+                {q.resposta_correta && (
+                  <p className="text-xs text-green-600 font-semibold">Resposta: {q.resposta_correta}</p>
+                )}
+              </div>
+              <button
+                onClick={() => handleDelete(q)}
+                className="p-2 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0"
+                title="Remover do banco"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showAddModal && <AddQuestionModal onClose={() => setShowAddModal(false)} />}
+    </div>
+  );
+}
+
 // ── Wizard State Types ────────────────────────────────────────────────────────
 
-type Origem = "ia" | "atividades" | "misto";
+type Origem = "ia" | "atividades" | "misto" | "banco";
 type Nivel = "facil" | "medio" | "dificil";
 
 interface WizardConfig {
@@ -418,6 +886,7 @@ function ExamWizard({
 }) {
   const isEditing = !!initialExam;
   const [step, setStep] = useState<1 | 2 | 3 | 4>(isEditing ? 4 : 1);
+  const [showBancoPicker, setShowBancoPicker] = useState(false);
   const [config, setConfig] = useState<WizardConfig>(() => {
     if (initialExam) {
       return {
@@ -445,6 +914,7 @@ function ExamWizard({
   const { mutate: generateExam, isPending: isGenerating } = useGenerateExam();
   const { mutate: createExam, isPending: isSaving } = useCreateExam();
   const { mutate: updateExam, isPending: isUpdating } = useUpdateExam();
+  const { mutate: bulkSave, isPending: isBulkSaving } = useBulkSaveQuestions();
   const { toast } = useToast();
 
   const valorPorQuestao = config.numeroQuestoes > 0 ? config.valorTotal / config.numeroQuestoes : 0;
@@ -501,16 +971,29 @@ function ExamWizard({
     );
   };
 
+  const handleBancoConfirm = (picked: Questao[]) => {
+    const gab: Gabarito = {};
+    picked.forEach((q) => {
+      if (q.resposta_correta) gab[q.numero] = q.resposta_correta;
+    });
+    setQuestoes(picked);
+    setGabarito(gab);
+    setConfig((c) => ({ ...c, numeroQuestoes: picked.length }));
+    setShowBancoPicker(false);
+    setStep(4);
+  };
+
   const handleSave = (status: StatusProva) => {
+    const origemApi: OrigemProva = config.origem === "banco" ? "misto" : config.origem;
     const payload = {
       titulo: config.titulo || `${config.disciplina} — ${config.serieTurma}`,
       disciplina: config.disciplina,
       serieTurma: config.serieTurma,
       tema: config.tema,
-      numeroQuestoes: String(config.numeroQuestoes),
+      numeroQuestoes: String(questoes.length || config.numeroQuestoes),
       valorTotal: String(config.valorTotal),
       tipoQuestao: config.tipoQuestao,
-      origem: config.origem,
+      origem: origemApi,
       atividadesBaseIds: config.atividadesSelecionadas,
       questoes,
       gabarito,
@@ -540,14 +1023,36 @@ function ExamWizard({
     }
   };
 
+  const handleSaveToBank = () => {
+    if (questoes.length === 0) return;
+    const toSave: CreateQuestionInput[] = questoes.map((q) => ({
+      enunciado: q.enunciado,
+      alternativas: q.alternativas ?? null,
+      resposta_correta: q.resposta_correta ?? null,
+      descritivo: q.descritivo,
+      disciplina: config.disciplina,
+      serieTurma: config.serieTurma,
+      tipoQuestao: q.alternativas ? "multipla_escolha" : "dissertativa",
+      tags: [],
+    }));
+    bulkSave(toSave, {
+      onSuccess: (saved) => {
+        toast({ title: `${saved.length} questão${saved.length !== 1 ? "ões salvas" : " salva"} no banco!` });
+      },
+      onError: () => toast({ title: "Erro ao salvar no banco.", variant: "destructive" }),
+    });
+  };
+
   const canGoToStep2 =
     config.disciplina.trim() &&
     config.serieTurma.trim() &&
     config.tema.trim() &&
-    (config.origem === "ia" || config.atividadesSelecionadas.length > 0);
+    (config.origem === "ia" || config.origem === "banco" || config.atividadesSelecionadas.length > 0);
 
   const canGenerate =
     canGoToStep2 && config.numeroQuestoes > 0 && config.valorTotal > 0;
+
+  const isBancoOrigin = config.origem === "banco";
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -635,11 +1140,12 @@ function ExamWizard({
 
               <div>
                 <label className="text-sm font-semibold text-foreground mb-2 block">Origem das questões *</label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
-                    { value: "ia" as Origem, icon: Sparkles, label: "Gerar com IA", desc: "A IA cria questões inéditas sobre o tema informado" },
-                    { value: "atividades" as Origem, icon: BookOpen, label: "Baseado em atividades", desc: "A IA usa suas atividades existentes como referência" },
-                    { value: "misto" as Origem, icon: Layers, label: "Misto", desc: "Combina atividades existentes com temas adicionais" },
+                    { value: "ia" as Origem, icon: Sparkles, label: "Gerar com IA", desc: "A IA cria questões inéditas" },
+                    { value: "atividades" as Origem, icon: BookOpen, label: "Das atividades", desc: "Baseado nas suas atividades" },
+                    { value: "misto" as Origem, icon: Layers, label: "Misto", desc: "Combina atividades + IA" },
+                    { value: "banco" as Origem, icon: Library, label: "Do banco", desc: "Reutiliza questões salvas" },
                   ].map(({ value, icon: Icon, label, desc }) => (
                     <button
                       key={value}
@@ -706,8 +1212,8 @@ function ExamWizard({
             </div>
           )}
 
-          {/* STEP 2 — Config */}
-          {step === 2 && (
+          {/* STEP 2 — Config (AI) or Bank Picker */}
+          {step === 2 && !isBancoOrigin && (
             <div className="space-y-5">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div>
@@ -795,6 +1301,35 @@ function ExamWizard({
             </div>
           )}
 
+          {/* STEP 2 — Bank Picker */}
+          {step === 2 && isBancoOrigin && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-display font-bold text-lg mb-1">Selecionar do banco de questões</h3>
+                <p className="text-sm text-muted-foreground">Escolha as questões que deseja usar nesta prova.</p>
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-foreground mb-1 block">Valor total da prova</label>
+                <div className="relative w-48">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">R$</span>
+                  <input
+                    type="number"
+                    min={1}
+                    step={0.5}
+                    className="w-full border border-border/60 rounded-xl pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-background"
+                    value={config.valorTotal}
+                    onChange={(e) => setConfig((c) => ({ ...c, valorTotal: parseFloat(e.target.value) || 0 }))}
+                  />
+                </div>
+              </div>
+              <BancoPicker
+                onConfirm={handleBancoConfirm}
+                onCancel={() => setStep(1)}
+                disciplinaHint={config.disciplina}
+              />
+            </div>
+          )}
+
           {/* STEP 3 — Generating */}
           {step === 3 && (
             <div className="flex flex-col items-center justify-center py-16 gap-6 text-center">
@@ -812,20 +1347,31 @@ function ExamWizard({
           {/* STEP 4 — Preview & Edit */}
           {step === 4 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
                   <h3 className="font-display font-bold text-lg">{config.titulo || `${config.disciplina} — ${config.serieTurma}`}</h3>
                   <p className="text-sm text-muted-foreground">{questoes.length} questão{questoes.length !== 1 ? "ões" : ""} · {config.valorTotal} pts total</p>
                 </div>
-                {!isEditing && (
-                  <button
-                    onClick={() => { setStep(3); setTimeout(handleGenerate, 100); }}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border hover:bg-muted text-sm font-semibold transition-colors"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    Gerar novamente
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {!isEditing && config.origem !== "banco" && (
+                    <button
+                      onClick={() => { setStep(3); setTimeout(handleGenerate, 100); }}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border hover:bg-muted text-sm font-semibold transition-colors"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Gerar novamente
+                    </button>
+                  )}
+                  {!isEditing && config.origem === "banco" && (
+                    <button
+                      onClick={() => setStep(2)}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border hover:bg-muted text-sm font-semibold transition-colors"
+                    >
+                      <Library className="w-4 h-4" />
+                      Mudar seleção
+                    </button>
+                  )}
+                </div>
               </div>
 
               {questoes.map((q, i) => (
@@ -853,6 +1399,27 @@ function ExamWizard({
                   ))}
                 </div>
               </div>
+
+              {/* Save to bank section */}
+              {!isEditing && config.origem !== "banco" && questoes.length > 0 && (
+                <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <Library className="w-5 h-5 text-primary shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Salvar no banco de questões</p>
+                      <p className="text-xs text-muted-foreground">Reutilize essas questões em provas futuras.</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleSaveToBank}
+                    disabled={isBulkSaving}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-primary text-primary hover:bg-primary/10 text-sm font-semibold transition-colors shrink-0"
+                  >
+                    {isBulkSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <BookMarked className="w-4 h-4" />}
+                    Salvar {questoes.length} questão{questoes.length !== 1 ? "ões" : ""}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -860,7 +1427,7 @@ function ExamWizard({
         {/* Footer */}
         <div className="flex items-center justify-between p-6 border-t border-border/50 gap-3">
           <div className="flex items-center gap-2">
-            {step > 1 && step !== 3 && (
+            {step > 1 && step !== 3 && !(step === 2 && isBancoOrigin) && (
               <button
                 onClick={() => setStep((s) => (s - 1) as 1 | 2 | 3 | 4)}
                 className="flex items-center gap-1 px-4 py-2 rounded-xl border border-border hover:bg-muted text-sm font-semibold transition-colors"
@@ -883,12 +1450,15 @@ function ExamWizard({
                     : "bg-muted text-muted-foreground cursor-not-allowed"
                 )}
               >
-                Próximo
-                <ChevronRight className="w-4 h-4" />
+                {isBancoOrigin ? (
+                  <><Library className="w-4 h-4 mr-1" />Escolher do banco</>
+                ) : (
+                  <>Próximo<ChevronRight className="w-4 h-4" /></>
+                )}
               </button>
             )}
 
-            {step === 2 && (
+            {step === 2 && !isBancoOrigin && (
               <button
                 onClick={() => { setStep(3); setTimeout(handleGenerate, 100); }}
                 disabled={!canGenerate || isGenerating}
@@ -933,9 +1503,12 @@ function ExamWizard({
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
+type MainTab = "provas" | "banco";
+
 export default function Provas() {
   const { data: exams = [], isLoading } = useExams();
   const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<MainTab>("provas");
   const [showWizard, setShowWizard] = useState(false);
   const [editingExam, setEditingExam] = useState<Exam | undefined>();
   const { toast } = useToast();
@@ -966,7 +1539,7 @@ export default function Provas() {
   return (
     <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <div className="flex items-center gap-3 mb-1">
             <div className="bg-primary/10 p-2 rounded-xl text-primary">
@@ -976,75 +1549,102 @@ export default function Provas() {
           </div>
           <p className="text-muted-foreground ml-14">Crie, gerencie e exporte provas com IA</p>
         </div>
-        <button
-          onClick={() => { setEditingExam(undefined); setShowWizard(true); }}
-          className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-2xl font-semibold hover:bg-primary/90 shadow-md shadow-primary/25 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Nova prova
-        </button>
-      </div>
-
-      {/* Loading */}
-      {isLoading && (
-        <div className="flex items-center justify-center py-24">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
-      )}
-
-      {/* Empty */}
-      {!isLoading && exams.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-24 text-center gap-4">
-          <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
-            <FileText className="w-10 h-10 text-primary" />
-          </div>
-          <h3 className="font-display font-bold text-xl">Nenhuma prova ainda</h3>
-          <p className="text-muted-foreground max-w-xs">Clique em "Nova prova" para criar sua primeira avaliação com IA.</p>
+        {activeTab === "provas" && (
           <button
-            onClick={() => setShowWizard(true)}
-            className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-2xl font-semibold hover:bg-primary/90 transition-all"
+            onClick={() => { setEditingExam(undefined); setShowWizard(true); }}
+            className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-2xl font-semibold hover:bg-primary/90 shadow-md shadow-primary/25 transition-all"
           >
             <Plus className="w-4 h-4" />
-            Criar prova
+            Nova prova
           </button>
-        </div>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 mb-6 bg-muted/50 rounded-2xl p-1 w-fit">
+        {([
+          { key: "provas" as MainTab, icon: FileText, label: "Provas" },
+          { key: "banco" as MainTab, icon: Library, label: "Banco de Questões" },
+        ]).map(({ key, icon: Icon, label }) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key)}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all",
+              activeTab === key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Icon className="w-4 h-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Provas Tab */}
+      {activeTab === "provas" && (
+        <>
+          {isLoading && (
+            <div className="flex items-center justify-center py-24">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          )}
+
+          {!isLoading && exams.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-24 text-center gap-4">
+              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+                <FileText className="w-10 h-10 text-primary" />
+              </div>
+              <h3 className="font-display font-bold text-xl">Nenhuma prova ainda</h3>
+              <p className="text-muted-foreground max-w-xs">Clique em "Nova prova" para criar sua primeira avaliação com IA.</p>
+              <button
+                onClick={() => setShowWizard(true)}
+                className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-2xl font-semibold hover:bg-primary/90 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                Criar prova
+              </button>
+            </div>
+          )}
+
+          {!isLoading && exams.length > 0 && (
+            <div className="space-y-8">
+              {ativas.length > 0 && (
+                <section>
+                  <h2 className="font-display font-bold text-lg mb-3 text-foreground">Ativas</h2>
+                  <div className="grid grid-cols-1 gap-4">
+                    {ativas.map((e) => (
+                      <ExamCard key={e.id} exam={e} onEdit={handleEdit} onDelete={() => {}} onExport={handleExport} />
+                    ))}
+                  </div>
+                </section>
+              )}
+              {rascunhos.length > 0 && (
+                <section>
+                  <h2 className="font-display font-bold text-lg mb-3 text-foreground">Rascunhos</h2>
+                  <div className="grid grid-cols-1 gap-4">
+                    {rascunhos.map((e) => (
+                      <ExamCard key={e.id} exam={e} onEdit={handleEdit} onDelete={() => {}} onExport={handleExport} />
+                    ))}
+                  </div>
+                </section>
+              )}
+              {finalizadas.length > 0 && (
+                <section>
+                  <h2 className="font-display font-bold text-lg mb-3 text-foreground">Finalizadas</h2>
+                  <div className="grid grid-cols-1 gap-4">
+                    {finalizadas.map((e) => (
+                      <ExamCard key={e.id} exam={e} onEdit={handleEdit} onDelete={() => {}} onExport={handleExport} />
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+          )}
+        </>
       )}
 
-      {/* Lists */}
-      {!isLoading && exams.length > 0 && (
-        <div className="space-y-8">
-          {ativas.length > 0 && (
-            <section>
-              <h2 className="font-display font-bold text-lg mb-3 text-foreground">Ativas</h2>
-              <div className="grid grid-cols-1 gap-4">
-                {ativas.map((e) => (
-                  <ExamCard key={e.id} exam={e} onEdit={handleEdit} onDelete={() => {}} onExport={handleExport} />
-                ))}
-              </div>
-            </section>
-          )}
-          {rascunhos.length > 0 && (
-            <section>
-              <h2 className="font-display font-bold text-lg mb-3 text-foreground">Rascunhos</h2>
-              <div className="grid grid-cols-1 gap-4">
-                {rascunhos.map((e) => (
-                  <ExamCard key={e.id} exam={e} onEdit={handleEdit} onDelete={() => {}} onExport={handleExport} />
-                ))}
-              </div>
-            </section>
-          )}
-          {finalizadas.length > 0 && (
-            <section>
-              <h2 className="font-display font-bold text-lg mb-3 text-foreground">Finalizadas</h2>
-              <div className="grid grid-cols-1 gap-4">
-                {finalizadas.map((e) => (
-                  <ExamCard key={e.id} exam={e} onEdit={handleEdit} onDelete={() => {}} onExport={handleExport} />
-                ))}
-              </div>
-            </section>
-          )}
-        </div>
-      )}
+      {/* Banco Tab */}
+      {activeTab === "banco" && <QuestionBankTab />}
 
       {/* Wizard */}
       {showWizard && (
