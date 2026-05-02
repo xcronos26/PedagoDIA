@@ -136,20 +136,18 @@ router.post("/billing/subscribe", requireAuth, async (req, res) => {
     const subscriptionId = subscription.id as string;
     const paymentLink = (subscription.paymentLink as string | undefined) ?? null;
 
+    // Save Asaas IDs only — plan status is NOT upgraded here.
+    // Premium access is only granted after PAYMENT_CONFIRMED webhook is received.
     await db
       .update(teachersTable)
-      .set({
-        asaasSubscriptionId: subscriptionId,
-        planType: planType as "basic" | "medium" | "advanced",
-        planStatus: "active",
-      })
+      .set({ asaasSubscriptionId: subscriptionId })
       .where(eq(teachersTable.id, teacher.id));
 
     res.json({
       subscriptionId,
       paymentLink,
       planType,
-      planStatus: "active",
+      planStatus: teacher.planStatus,
     });
   } catch (err: unknown) {
     req.log.error({ err }, "Error creating subscription");
@@ -162,14 +160,16 @@ router.post("/billing/subscribe", requireAuth, async (req, res) => {
 router.post("/webhooks/asaas", async (req, res) => {
   try {
     const token = process.env.ASAAS_WEBHOOK_TOKEN;
-    if (token) {
-      const provided =
-        (req.headers["asaas-access-token"] as string | undefined) ??
-        (req.headers["access_token"] as string | undefined);
-      if (provided !== token) {
-        res.status(401).json({ error: "Token inválido" });
-        return;
-      }
+    if (!token) {
+      res.status(503).json({ error: "Webhook não configurado" });
+      return;
+    }
+    const provided =
+      (req.headers["asaas-access-token"] as string | undefined) ??
+      (req.headers["access_token"] as string | undefined);
+    if (provided !== token) {
+      res.status(401).json({ error: "Token inválido" });
+      return;
     }
 
     const event = req.body as {
