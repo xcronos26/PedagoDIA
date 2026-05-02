@@ -18,6 +18,9 @@ const PUBLIC_FIELDS = {
   weeklySchedule: teachersTable.weeklySchedule,
   grade: teachersTable.grade,
   teacherType: teachersTable.teacherType,
+  planType: teachersTable.planType,
+  planStatus: teachersTable.planStatus,
+  planExpirationDate: teachersTable.planExpirationDate,
 };
 
 router.post("/auth/register", async (req, res) => {
@@ -42,12 +45,24 @@ router.post("/auth/register", async (req, res) => {
       name: name.trim(),
       email: email.toLowerCase().trim(),
       passwordHash,
+      planType: "free",
+      planStatus: "active",
     }).returning();
 
     const token = generateToken({ teacherId: teacher.id, email: teacher.email });
     res.status(201).json({
       token,
-      teacher: { id: teacher.id, name: teacher.name, email: teacher.email, weeklySchedule: teacher.weeklySchedule ?? null, grade: teacher.grade ?? null, teacherType: teacher.teacherType ?? null },
+      teacher: {
+        id: teacher.id,
+        name: teacher.name,
+        email: teacher.email,
+        weeklySchedule: teacher.weeklySchedule ?? null,
+        grade: teacher.grade ?? null,
+        teacherType: teacher.teacherType ?? null,
+        planType: teacher.planType,
+        planStatus: teacher.planStatus,
+        planExpirationDate: teacher.planExpirationDate ?? null,
+      },
     });
   } catch (err) {
     req.log.error({ err }, "Error registering teacher");
@@ -75,7 +90,17 @@ router.post("/auth/login", async (req, res) => {
     const token = generateToken({ teacherId: teacher.id, email: teacher.email });
     res.json({
       token,
-      teacher: { id: teacher.id, name: teacher.name, email: teacher.email, weeklySchedule: teacher.weeklySchedule ?? null, grade: teacher.grade ?? null, teacherType: teacher.teacherType ?? null },
+      teacher: {
+        id: teacher.id,
+        name: teacher.name,
+        email: teacher.email,
+        weeklySchedule: teacher.weeklySchedule ?? null,
+        grade: teacher.grade ?? null,
+        teacherType: teacher.teacherType ?? null,
+        planType: teacher.planType,
+        planStatus: teacher.planStatus,
+        planExpirationDate: teacher.planExpirationDate ?? null,
+      },
     });
   } catch (err) {
     req.log.error({ err }, "Error logging in teacher");

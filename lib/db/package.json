@@ -9,7 +9,8 @@
   },
   "scripts": {
     "push": "drizzle-kit push --config ./drizzle.config.db.ts",
-    "push-force": "drizzle-kit push --force --config ./drizzle.config.db.ts"
+    "push-force": "drizzle-kit push --force --config ./drizzle.config.db.ts",
+    "migrate:backfill-billing": "tsx src/migrations/backfill-billing-plan.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
