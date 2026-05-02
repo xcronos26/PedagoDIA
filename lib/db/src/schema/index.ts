@@ -8,3 +8,6 @@ export * from "./deliveries";
 export * from "./student-reports";
 export * from "./lesson-plans";
 export * from "./exams";
+export * from "./schools";
+export * from "./memberships";
+export * from "./prompt-logs";

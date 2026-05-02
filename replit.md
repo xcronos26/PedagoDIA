@@ -78,12 +78,28 @@ Expo React Native app (PedagoDIA) for classroom management. Features multi-teach
 ### API Server (`artifacts/api-server`)
 Express 5 API with JWT auth. All data routes require Bearer token.
 
-- **Auth routes**: `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`
+- **Auth routes**: `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `PATCH /api/auth/profile`
 - **Protected routes**: `/api/students`, `/api/activities`, `/api/attendance`, `/api/subjects`, `/api/deliveries`
 - **Auth**: `bcryptjs` (password hashing), `jsonwebtoken` (JWT, 30d expiry), `requireAuth` middleware
 - **JWT_SECRET**: Set in shared environment variables
-- **AI routes** (Gemini): `POST /ai/suggest` (BNCC+objectives chips), `POST /ai/generate-plan` (day/week plans), `POST /ai/generate-activity`
+- **AI routes** (Gemini): `POST /ai/suggest`, `POST /ai/generate-plan`, `POST /ai/generate-activity`, `POST /ai/generate-exam`
 - **GEMINI_API_KEY**: Set in Replit Secrets. Uses `@google/generative-ai` SDK with `gemini-2.5-flash`
+- **Admin routes** (super_admin only): `GET /api/admin/stats`, `GET /api/admin/teachers`, `PATCH /api/admin/teachers/:id/block`, `PATCH /api/admin/teachers/:id/role`, `PATCH /api/admin/teachers/:id/plan`, `GET /api/admin/schools`, `POST /api/admin/schools`, `PATCH /api/admin/schools/:id/status`
+- **Escola routes** (admin_institucional+): `GET /api/escola/dashboard`
+- **Schools routes**: `POST /api/schools/join`, `POST /api/schools`, `GET /api/schools/mine`
+- **Role middleware**: `requireRole(...roles)` checks JWT + DB role; `requireSchoolAdmin()` allows admin_institucional + super_admin
+
+### Multi-escola Architecture
+
+- **Teachers**: Now have `role` (`professor`|`admin_institucional`|`super_admin`, default `professor`), `vinculo` (`individual`|`escola`, default `individual`), `isBlocked` (bool, default false)
+- **Schools table**: `id`, `name`, `inviteCode` (unique 6-char code), `status` (`ativa`|`inativa`), `createdBy`, `createdAt`
+- **Memberships table**: `id`, `teacherId`, `schoolId`, `role` (`admin_institucional`|`professor`), `status` (`pendente`|`ativo`), `joinedAt`
+- **Prompt logs table**: `id`, `teacherId`, `schoolId`, `endpoint`, `status` (`sucesso`|`erro`), `createdAt`
+- **Web pages**: `/admin` (super_admin only — stats, teacher management, school management), `/escola` (admin_institucional+ — school dashboard with invite code, teacher list)
+- **Web routing**: `RoleRoute` wrapper in App.tsx gates `/admin` and `/escola` by role
+- **Layout**: Role-aware sidebar — "Minha Escola" shows for admin_institucional+, "Super Admin" shows for super_admin only
+- **Login**: Blocked users get 403. Login + register + /auth/me now return `role` and `vinculo` in teacher object
+- **Existing professors**: Unaffected — all defaults (role=professor, vinculo=individual, isBlocked=false) applied via DB column defaults
 
 ## Packages
 

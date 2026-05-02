@@ -14,6 +14,9 @@ export type WeeklySchedule = {
   sexta: DayEntry[];
 };
 
+export type TeacherRole = "professor" | "admin_institucional" | "super_admin";
+export type TeacherVinculo = "individual" | "escola";
+
 export interface Teacher {
   id: string;
   name: string;
@@ -21,6 +24,8 @@ export interface Teacher {
   weeklySchedule?: WeeklySchedule | null;
   grade?: string | null;
   teacherType?: "regente" | "disciplina" | null;
+  role?: TeacherRole;
+  vinculo?: TeacherVinculo;
 }
 
 interface AuthContextType {

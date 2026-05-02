@@ -22,6 +22,8 @@ import BemVinda from "@/pages/bem-vinda";
 import Perfil from "@/pages/perfil";
 import Turmas from "@/pages/turmas";
 import Provas from "@/pages/provas";
+import Admin from "@/pages/admin";
+import Escola from "@/pages/escola";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -32,6 +34,17 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 
   if (isLoading) return null;
   if (!user) return <Redirect to="/login" />;
+
+  return <Component />;
+}
+
+// Role-protected Route wrapper
+function RoleRoute({ component: Component, roles }: { component: React.ComponentType; roles: string[] }) {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) return null;
+  if (!user) return <Redirect to="/login" />;
+  if (!user.role || !roles.includes(user.role)) return <Redirect to="/" />;
 
   return <Component />;
 }
@@ -75,6 +88,8 @@ function Router() {
             <Route path="/planejamento"><ProtectedRoute component={Planejamento} /></Route>
             <Route path="/provas"><ProtectedRoute component={Provas} /></Route>
             <Route path="/sobre"><ProtectedRoute component={Sobre} /></Route>
+            <Route path="/admin"><RoleRoute component={Admin} roles={["super_admin"]} /></Route>
+            <Route path="/escola"><RoleRoute component={Escola} roles={["admin_institucional", "super_admin"]} /></Route>
             <Route component={NotFound} />
           </Switch>
         </Layout>

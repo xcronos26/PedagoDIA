@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -17,6 +17,8 @@ export type WeeklySchedule = {
 
 export type PlanType = "free" | "basic" | "medium" | "advanced";
 export type PlanStatus = "trial" | "active" | "overdue" | "canceled";
+export type TeacherRole = "professor" | "admin_institucional" | "super_admin";
+export type TeacherVinculo = "individual" | "escola";
 
 export const teachersTable = pgTable("teachers", {
   id: text("id").primaryKey(),
@@ -32,6 +34,9 @@ export const teachersTable = pgTable("teachers", {
   planExpirationDate: timestamp("plan_expiration_date"),
   asaasCustomerId: text("asaas_customer_id"),
   asaasSubscriptionId: text("asaas_subscription_id"),
+  role: text("role").$type<TeacherRole>().default("professor").notNull(),
+  vinculo: text("vinculo").$type<TeacherVinculo>().default("individual").notNull(),
+  isBlocked: boolean("is_blocked").default(false).notNull(),
 });
 
 export const insertTeacherSchema = createInsertSchema(teachersTable);

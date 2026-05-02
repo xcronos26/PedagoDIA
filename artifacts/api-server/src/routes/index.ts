@@ -13,6 +13,9 @@ import lessonPlansRouter from "./lesson-plans";
 import aiRouter from "./ai";
 import billingRouter from "./billing";
 import examsRouter from "./exams";
+import adminRouter from "./admin";
+import schoolsRouter from "./schools";
+import escolaRouter from "./escola";
 
 const router: IRouter = Router();
 
@@ -30,5 +33,8 @@ router.use(lessonPlansRouter);
 router.use(aiRouter);
 router.use(billingRouter);
 router.use(examsRouter);
+router.use(adminRouter);
+router.use(schoolsRouter);
+router.use(escolaRouter);
 
 export default router;

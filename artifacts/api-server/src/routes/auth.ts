@@ -21,6 +21,9 @@ const PUBLIC_FIELDS = {
   planType: teachersTable.planType,
   planStatus: teachersTable.planStatus,
   planExpirationDate: teachersTable.planExpirationDate,
+  role: teachersTable.role,
+  vinculo: teachersTable.vinculo,
+  isBlocked: teachersTable.isBlocked,
 };
 
 router.post("/auth/register", async (req, res) => {
@@ -62,6 +65,8 @@ router.post("/auth/register", async (req, res) => {
         planType: teacher.planType,
         planStatus: teacher.planStatus,
         planExpirationDate: teacher.planExpirationDate ?? null,
+        role: teacher.role,
+        vinculo: teacher.vinculo,
       },
     });
   } catch (err) {
@@ -87,6 +92,10 @@ router.post("/auth/login", async (req, res) => {
       res.status(401).json({ error: "E-mail ou senha incorretos" });
       return;
     }
+    if (teacher.isBlocked) {
+      res.status(403).json({ error: "Conta bloqueada. Entre em contato com o suporte." });
+      return;
+    }
     const token = generateToken({ teacherId: teacher.id, email: teacher.email });
     res.json({
       token,
@@ -100,6 +109,8 @@ router.post("/auth/login", async (req, res) => {
         planType: teacher.planType,
         planStatus: teacher.planStatus,
         planExpirationDate: teacher.planExpirationDate ?? null,
+        role: teacher.role,
+        vinculo: teacher.vinculo,
       },
     });
   } catch (err) {

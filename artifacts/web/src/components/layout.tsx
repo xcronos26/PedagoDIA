@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { CalendarDays, CheckSquare, BookOpen, BarChart3, LogOut, GraduationCap, LayoutDashboard, ClipboardList, Heart, Users, User, FileText } from "lucide-react";
+import { CalendarDays, CheckSquare, BookOpen, BarChart3, LogOut, GraduationCap, LayoutDashboard, ClipboardList, Heart, Users, User, FileText, Shield, School } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -9,7 +9,15 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const navItems = [
+type NavItem = {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  mobileHide?: boolean;
+  roles?: string[];
+};
+
+const navItems: NavItem[] = [
   { name: "Início", href: "/", icon: LayoutDashboard, mobileHide: true },
   { name: "Perfil", href: "/perfil", icon: User, mobileHide: true },
   { name: "Turmas", href: "/turmas", icon: Users },
@@ -20,13 +28,18 @@ const navItems = [
   { name: "Provas", href: "/provas", icon: FileText },
   { name: "Relatórios", href: "/relatorios", icon: BarChart3 },
   { name: "Sobre", href: "/sobre", icon: Heart, mobileHide: true },
+  { name: "Minha Escola", href: "/escola", icon: School, mobileHide: true, roles: ["admin_institucional", "super_admin"] },
+  { name: "Super Admin", href: "/admin", icon: Shield, mobileHide: true, roles: ["super_admin"] },
 ];
-
-const mobileNavItems = navItems.filter(item => !('mobileHide' in item && item.mobileHide));
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, logout, isLoading } = useAuth();
+
+  const visibleNavItems = navItems.filter(
+    (item) => !item.roles || (user?.role && item.roles.includes(user.role))
+  );
+  const mobileNavItems = visibleNavItems.filter((item) => !item.mobileHide);
 
   if (isLoading) {
     return <div className="min-h-screen bg-background flex items-center justify-center">
@@ -52,8 +65,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 px-4 space-y-1 mt-2 overflow-y-auto">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = location === item.href;
+            const isAdmin = item.href === "/admin";
+            const isEscola = item.href === "/escola";
             return (
               <Link
                 key={item.name}
@@ -61,7 +76,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 className={cn(
                   "flex items-center gap-3 px-4 py-3 rounded-2xl font-semibold transition-all duration-200 group",
                   isActive
-                    ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 translate-x-1"
+                    ? isAdmin
+                      ? "bg-red-600 text-white shadow-md shadow-red-500/25 translate-x-1"
+                      : isEscola
+                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25 translate-x-1"
+                        : "bg-primary text-primary-foreground shadow-md shadow-primary/25 translate-x-1"
                     : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 )}
               >
