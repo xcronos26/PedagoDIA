@@ -1,0 +1,245 @@
+# Prompt para o Replit Agent — Relatório Bimestral do Aluno
+
+Cole esse prompt inteiro no Replit Agent.
+
+---
+
+## Contexto do app
+
+Esse app é uma plataforma pedagógica para professores. Já existem as seguintes seções:
+- Planejamento semanal
+- Geração de atividades
+- Central de Provas (com notas e desempenho por aluno)
+- Relatório do aluno (seção já existente no app — usar os dados de lá)
+
+O app usa **Anthropic Claude** como IA, banco de dados do Replit para persistência, e já tem cadastrados: escola, professora, turmas, alunos, atividades, provas e notas.
+
+---
+
+## O que precisa ser construído
+
+Adicionar uma nova seção chamada **"Relatório Bimestral"** no menu do app. Ela permite que o professor gere, para cada aluno individualmente, um relatório completo no formato exigido pela Secretaria de Educação, com base nos dados já existentes no app + observações que o professor preenche.
+
+---
+
+## Fluxo completo da funcionalidade
+
+### Tela 1 — Seleção do aluno
+
+- Professor escolhe: **bimestre** (1º, 2º, 3º ou 4º) e **ano letivo**
+- Lista de alunos da turma com status de cada um:
+  - 🔴 Não iniciado
+  - 🟡 Rascunho salvo
+  - 🟢 Relatório gerado
+- Botão **"Gerar relatório"** em cada aluno
+
+---
+
+### Tela 2 — Formulário de observações do professor
+
+Essa tela é dividida em dois blocos:
+
+#### Bloco A — Dados automáticos (buscar do banco, exibir em modo leitura)
+
+Buscar e exibir as seguintes informações já existentes no app para aquele aluno/bimestre:
+
+- **Total de faltas** no bimestre
+- **Notas das provas** por disciplina
+- **Atividades realizadas** (lista com nome e status de entrega)
+- **Dados do relatório do aluno** já existente no app (se houver)
+
+Esses dados serão passados para a IA como contexto objetivo.
+
+#### Bloco B — Observações qualitativas do professor (formulário editável)
+
+O professor preenche campos de texto livre para cada disciplina. Usar as disciplinas padrão, mas permitir que o professor adicione ou remova:
+
+- Matemática
+- Língua Portuguesa — Gramática
+- Língua Portuguesa — Leitura e Interpretação
+- Língua Portuguesa — Escrita e Fluência Leitora
+- História e Geografia
+- Ciências
+- Educação Física
+- Artes
+
+Para cada disciplina, dois campos de texto:
+- **Pontos positivos / avanços observados**
+- **Dificuldades / pontos a desenvolver**
+
+Campo extra no final:
+- **Aspectos comportamentais e sociais** (texto livre)
+- **Estratégias pedagógicas utilizadas** (texto livre)
+- **Observações gerais / síntese** (texto livre)
+
+Botão ao final: **"Gerar relatório com IA"**
+
+---
+
+### Tela 3 — Geração pela IA
+
+Chamar a API da Anthropic com o seguinte prompt de sistema:
+
+```
+Você é um assistente pedagógico especializado em redigir relatórios bimestrais escolares 
+para a Secretaria de Educação do Distrito Federal (SEEDF), seguindo o padrão da BNCC 
+e do Currículo em Movimento da SEEDF.
+
+Redija um relatório bimestral completo e formal para o(a) estudante informado(a), 
+com base nos dados fornecidos pela professora.
+
+O relatório deve seguir EXATAMENTE esta estrutura:
+
+1. Parágrafo de abertura:
+"Este relatório sintetiza o desenvolvimento do(a) estudante [NOME COMPLETO], 
+correspondente ao [Nº]º bimestre do ano letivo de [ANO]. A avaliação do 
+desenvolvimento das capacidades e competências está baseada dentro de cada 
+componente curricular tendo como referência a Base Nacional Comum Curricular e 
+o Currículo em Movimento da SEEDF."
+
+2. Para cada disciplina informada, um bloco com:
+   - As habilidades desenvolvidas no bimestre (lista em texto corrido, não tópicos)
+   - Análise do desempenho do estudante: avanços, pontos fortes e dificuldades
+   - Sempre usar linguagem pedagógica formal, na terceira pessoa, positiva e construtiva
+   - Nunca usar linguagem negativa ou depreciativa sobre o aluno
+
+3. Bloco de aspectos comportamentais e sociais
+
+4. Bloco de estratégias pedagógicas utilizadas pela professora
+
+5. Parágrafo de síntese final:
+   Resumo do desempenho geral, mencionando assiduidade, desenvolvimento e 
+   parceria com a família (se informado)
+
+Regras de escrita:
+- Sempre na terceira pessoa (o estudante, a estudante)
+- Tom formal, pedagógico e construtivo
+- Dificuldades devem ser apresentadas como "encontra-se em processo de consolidação", 
+  "ainda necessita de apoio", "segue avançando", nunca de forma negativa direta
+- Extensão similar a um relatório profissional completo (4 a 5 parágrafos por disciplina)
+- Não usar tópicos ou listas — apenas texto corrido em parágrafos
+
+Dados do aluno e observações da professora:
+[INSERIR DADOS AQUI]
+```
+
+Montar o conteúdo `[INSERIR DADOS AQUI]` assim:
+
+```
+Nome do aluno: [nome completo]
+Bimestre: [nº] bimestre de [ano]
+Série/Turma: [série e turma]
+Professora: [nome]
+Escola: [nome da escola]
+
+DADOS OBJETIVOS DO APP:
+- Faltas no bimestre: [X]
+- Notas das provas: [disciplina: nota, disciplina: nota...]
+- Atividades entregues: [X de Y]
+
+OBSERVAÇÕES DA PROFESSORA POR DISCIPLINA:
+[Para cada disciplina preenchida:]
+  Disciplina: [nome]
+  Avanços: [texto da professora]
+  Dificuldades: [texto da professora]
+
+ASPECTOS COMPORTAMENTAIS:
+[texto da professora]
+
+ESTRATÉGIAS PEDAGÓGICAS:
+[texto da professora]
+
+SÍNTESE GERAL:
+[texto da professora]
+```
+
+---
+
+### Tela 4 — Prévia e edição do relatório
+
+- Exibir o relatório gerado em formato de texto editável (textarea grande)
+- Professor pode editar qualquer parte antes de salvar
+- Botões:
+  - **"Salvar relatório"** — salva no banco
+  - **"Gerar novamente"** — volta para o formulário
+  - **"Exportar PDF"** — gera o PDF final
+
+---
+
+## Exportação em PDF
+
+Ao clicar em "Exportar PDF", gerar um documento com a seguinte formatação usando **jsPDF**:
+
+```
+[Nome da escola em maiúsculas, centralizado, negrito]
+
+RELATÓRIO
+[Nome completo do aluno]
+[Bimestre] bimestre — [Ano letivo]
+Professora: [nome] | Série/Turma: [série]
+
+────────────────────────────────────────
+
+[Texto completo do relatório em parágrafos]
+
+────────────────────────────────────────
+[Cidade], [data de geração]
+Professora: [nome]
+```
+
+- Fonte legível (12-14px), margens adequadas para impressão A4
+- Texto justificado
+- Quebra de página automática se o conteúdo ultrapassar uma página
+
+---
+
+## Estrutura de dados para salvar no banco
+
+```
+relatorios_bimestrais:
+  - id
+  - professor_id
+  - aluno_id
+  - aluno_nome
+  - bimestre (1, 2, 3 ou 4)
+  - ano_letivo
+  - serie_turma
+  - dados_automaticos (JSON: faltas, notas, atividades)
+  - observacoes_professor (JSON com os campos do formulário)
+  - texto_gerado (texto completo do relatório)
+  - status (rascunho | finalizado)
+  - criado_em
+  - atualizado_em
+```
+
+---
+
+## Navegação e menu
+
+- Adicionar **"Relatório Bimestral"** ao menu/sidebar já existente
+- Usar o mesmo padrão visual (cores, fontes, componentes) do app atual
+- Acessível apenas para o professor logado
+
+---
+
+## Regras importantes
+
+1. **Não alterar** nenhuma funcionalidade existente (planejamento, atividades, provas, relatório do aluno já existente)
+2. Reaproveitar os dados já no banco: escola, professora, alunos, notas, faltas, atividades
+3. Se o professor já tiver um relatório salvo para aquele aluno/bimestre, carregar o rascunho automaticamente ao abrir o formulário
+4. Tratar erros da API da Anthropic com mensagem amigável
+5. Salvar rascunho automaticamente ao sair sem finalizar
+
+---
+
+## Ordem de implementação sugerida
+
+1. Criar tabela `relatorios_bimestrais` no banco
+2. Criar tela de seleção de aluno com status
+3. Criar formulário de observações (Bloco A automático + Bloco B manual)
+4. Implementar chamada à API da Anthropic com o prompt estruturado
+5. Criar tela de prévia editável
+6. Implementar exportação PDF com jsPDF
+7. Adicionar ao menu do app
+
+---
