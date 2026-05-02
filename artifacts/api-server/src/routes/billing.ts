@@ -29,7 +29,7 @@ function getAsaasApiKey(): string {
   return key;
 }
 
-async function asaasFetch(path: string, options: RequestInit = {}) {
+async function asaasFetch(path: string, options: RequestInit = {}): Promise<Record<string, unknown>> {
   const url = `${getAsaasBaseUrl()}${path}`;
   const res = await fetch(url, {
     ...options,
@@ -39,10 +39,11 @@ async function asaasFetch(path: string, options: RequestInit = {}) {
       ...(options.headers ?? {}),
     },
   });
-  const data = await res.json();
+  const data = (await res.json()) as Record<string, unknown>;
   if (!res.ok) {
+    const errors = data.errors as Array<{ description?: string }> | undefined;
     throw Object.assign(
-      new Error(data?.errors?.[0]?.description ?? "Erro na API do Asaas"),
+      new Error(errors?.[0]?.description ?? "Erro na API do Asaas"),
       { status: res.status, asaasData: data }
     );
   }
@@ -64,8 +65,9 @@ async function findOrCreateCustomer(
   }
 
   const search = await asaasFetch(`/customers?email=${encodeURIComponent(email)}`);
-  if (search.data && search.data.length > 0) {
-    const customerId: string = search.data[0].id;
+  const searchData = search.data as Array<{ id: string }> | undefined;
+  if (searchData && searchData.length > 0) {
+    const customerId: string = searchData[0].id;
     await db
       .update(teachersTable)
       .set({ asaasCustomerId: customerId })
@@ -78,12 +80,13 @@ async function findOrCreateCustomer(
     body: JSON.stringify({ name, email, externalReference: teacherId }),
   });
 
+  const createdId = created.id as string;
   await db
     .update(teachersTable)
-    .set({ asaasCustomerId: created.id })
+    .set({ asaasCustomerId: createdId })
     .where(eq(teachersTable.id, teacherId));
 
-  return created.id as string;
+  return createdId;
 }
 
 router.post("/billing/subscribe", requireAuth, async (req, res) => {
@@ -130,19 +133,20 @@ router.post("/billing/subscribe", requireAuth, async (req, res) => {
       }),
     });
 
+    const subscriptionId = subscription.id as string;
+    const paymentLink = (subscription.paymentLink as string | undefined) ?? null;
+
     await db
       .update(teachersTable)
       .set({
-        asaasSubscriptionId: subscription.id,
+        asaasSubscriptionId: subscriptionId,
         planType: planType as "basic" | "medium" | "advanced",
         planStatus: "active",
       })
       .where(eq(teachersTable.id, teacher.id));
 
-    const paymentLink = subscription.paymentLink ?? null;
-
     res.json({
-      subscriptionId: subscription.id,
+      subscriptionId,
       paymentLink,
       planType,
       planStatus: "active",
