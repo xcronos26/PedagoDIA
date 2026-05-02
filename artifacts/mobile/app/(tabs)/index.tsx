@@ -121,6 +121,7 @@ export default function AttendanceScreen() {
   const [editClassId, setEditClassId] = useState<string | null>(null);
 
   const hasUnclassifiedStudents = useMemo(() => students.some(s => s.classId === null), [students]);
+  const noClassCount = useMemo(() => students.filter(s => s.classId === null).length, [students]);
 
   const filteredStudents = useMemo(() => {
     if (!selectedClassId) return students;
@@ -222,6 +223,7 @@ export default function AttendanceScreen() {
         selectedClassId={selectedClassId}
         onSelect={setSelectedClassId}
         showNoClass={hasUnclassifiedStudents || selectedClassId === NO_CLASS_FILTER}
+        noClassCount={noClassCount}
       />
 
       <DataLoadingWrapper isLoaded={isLoaded} loadError={loadError} onRetry={loadData}>

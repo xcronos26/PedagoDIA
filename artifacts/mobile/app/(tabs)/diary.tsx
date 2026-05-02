@@ -38,6 +38,7 @@ export default function DiaryScreen() {
   const { students, classes, selectedClassId, setSelectedClassId, attendance, setAttendanceRecord, justifyAbsence, getAttendanceForDate, isLoaded, loadError, loadData } = useApp();
 
   const hasUnclassifiedStudents = useMemo(() => students.some(s => s.classId === null), [students]);
+  const noClassCount = useMemo(() => students.filter(s => s.classId === null).length, [students]);
 
   const filteredStudents = useMemo(() => {
     if (!selectedClassId) return students;
@@ -193,6 +194,7 @@ export default function DiaryScreen() {
         selectedClassId={selectedClassId}
         onSelect={setSelectedClassId}
         showNoClass={hasUnclassifiedStudents || selectedClassId === NO_CLASS_FILTER}
+        noClassCount={noClassCount}
       />
 
       <DataLoadingWrapper isLoaded={isLoaded} loadError={loadError} onRetry={loadData}>

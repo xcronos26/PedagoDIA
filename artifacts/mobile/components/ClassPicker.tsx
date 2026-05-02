@@ -12,13 +12,16 @@ interface ClassPickerProps {
   onSelect: (id: string | null) => void;
   showAll?: boolean;
   showNoClass?: boolean;
+  noClassCount?: number;
 }
 
-export function ClassPicker({ classes, selectedClassId, onSelect, showAll = true, showNoClass = false }: ClassPickerProps) {
+export function ClassPicker({ classes, selectedClassId, onSelect, showAll = true, showNoClass = false, noClassCount }: ClassPickerProps) {
   if (classes.length === 0 && !showNoClass) return null;
 
   const isNoClassActive = selectedClassId === NO_CLASS_FILTER;
   const isAllActive = !selectedClassId;
+
+  const totalCount = classes.reduce((sum, t) => sum + t.studentCount, 0) + (noClassCount ?? 0);
 
   return (
     <View style={styles.wrapper}>
@@ -37,7 +40,7 @@ export function ClassPicker({ classes, selectedClassId, onSelect, showAll = true
             activeOpacity={0.8}
           >
             <Text style={[styles.chipText, isAllActive && styles.chipTextActive]}>
-              Todas
+              Todas{totalCount > 0 ? ` (${totalCount})` : ''}
             </Text>
           </TouchableOpacity>
         )}
@@ -51,7 +54,7 @@ export function ClassPicker({ classes, selectedClassId, onSelect, showAll = true
             activeOpacity={0.8}
           >
             <Text style={[styles.chipText, isNoClassActive && styles.chipTextActive]}>
-              Sem turma
+              {noClassCount != null ? `Sem turma (${noClassCount})` : 'Sem turma'}
             </Text>
           </TouchableOpacity>
         )}
@@ -73,7 +76,7 @@ export function ClassPicker({ classes, selectedClassId, onSelect, showAll = true
               activeOpacity={0.8}
             >
               <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
-                {turma.name}
+                {turma.name} ({turma.studentCount})
               </Text>
             </TouchableOpacity>
           );
