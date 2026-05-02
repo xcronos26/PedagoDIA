@@ -25,6 +25,7 @@ import {
 import {
   useQuestions,
   useCreateQuestion,
+  useUpdateQuestion,
   useBulkSaveQuestions,
   useDeleteQuestion,
   type Question,
@@ -449,18 +450,31 @@ function BancoPicker({
   );
 }
 
-// ── Add Question Modal ────────────────────────────────────────────────────────
+// ── Add/Edit Question Modal ───────────────────────────────────────────────────
 
-function AddQuestionModal({ onClose }: { onClose: () => void }) {
-  const [enunciado, setEnunciado] = useState("");
-  const [disciplina, setDisciplina] = useState("");
-  const [serieTurma, setSerieTurma] = useState("");
-  const [tipo, setTipo] = useState<"multipla_escolha" | "dissertativa">("multipla_escolha");
-  const [alts, setAlts] = useState({ A: "", B: "", C: "", D: "" });
-  const [respostaCorreta, setRespostaCorreta] = useState("");
-  const [descritivo, setDescritivo] = useState("");
-  const [tagsInput, setTagsInput] = useState("");
-  const { mutate: createQuestion, isPending } = useCreateQuestion();
+function AddQuestionModal({
+  onClose,
+  initialQuestion,
+}: {
+  onClose: () => void;
+  initialQuestion?: Question;
+}) {
+  const isEditing = !!initialQuestion;
+  const [enunciado, setEnunciado] = useState(initialQuestion?.enunciado ?? "");
+  const [disciplina, setDisciplina] = useState(initialQuestion?.disciplina ?? "");
+  const [serieTurma, setSerieTurma] = useState(initialQuestion?.serieTurma ?? "");
+  const [tipo, setTipo] = useState<"multipla_escolha" | "dissertativa">(
+    initialQuestion?.tipoQuestao ?? "multipla_escolha"
+  );
+  const [alts, setAlts] = useState(
+    initialQuestion?.alternativas ?? { A: "", B: "", C: "", D: "" }
+  );
+  const [respostaCorreta, setRespostaCorreta] = useState(initialQuestion?.resposta_correta ?? "");
+  const [descritivo, setDescritivo] = useState(initialQuestion?.descritivo ?? "");
+  const [tagsInput, setTagsInput] = useState((initialQuestion?.tags ?? []).join(", "));
+  const { mutate: createQuestion, isPending: isCreating } = useCreateQuestion();
+  const { mutate: updateQuestion, isPending: isUpdating } = useUpdateQuestion();
+  const isPending = isCreating || isUpdating;
   const { toast } = useToast();
 
   const handleSave = () => {
@@ -480,20 +494,33 @@ function AddQuestionModal({ onClose }: { onClose: () => void }) {
         ? { alternativas: alts, resposta_correta: respostaCorreta || null }
         : { alternativas: null, resposta_correta: null }),
     };
-    createQuestion(payload, {
-      onSuccess: () => {
-        toast({ title: "Questão salva no banco!" });
-        onClose();
-      },
-      onError: () => toast({ title: "Erro ao salvar questão.", variant: "destructive" }),
-    });
+    if (isEditing) {
+      updateQuestion(
+        { id: initialQuestion.id, ...payload },
+        {
+          onSuccess: () => {
+            toast({ title: "Questão atualizada!" });
+            onClose();
+          },
+          onError: () => toast({ title: "Erro ao atualizar questão.", variant: "destructive" }),
+        }
+      );
+    } else {
+      createQuestion(payload, {
+        onSuccess: () => {
+          toast({ title: "Questão salva no banco!" });
+          onClose();
+        },
+        onError: () => toast({ title: "Erro ao salvar questão.", variant: "destructive" }),
+      });
+    }
   };
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-background rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between p-6 border-b border-border/50">
-          <h2 className="font-display font-bold text-xl">Adicionar questão ao banco</h2>
+          <h2 className="font-display font-bold text-xl">{isEditing ? "Editar questão" : "Adicionar questão ao banco"}</h2>
           <button onClick={onClose} className="p-2 rounded-xl hover:bg-muted transition-colors">
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
@@ -608,7 +635,7 @@ function AddQuestionModal({ onClose }: { onClose: () => void }) {
             className="flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-            Salvar no banco
+            {isEditing ? "Salvar alterações" : "Salvar no banco"}
           </button>
         </div>
       </div>
@@ -625,6 +652,7 @@ function QuestionBankTab() {
   const [search, setSearch] = useState("");
   const [filterDisciplina, setFilterDisciplina] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState<Question | undefined>();
 
   const disciplinas = useMemo(() => {
     const set = new Set(questions.map((q) => q.disciplina).filter(Boolean));
@@ -738,19 +766,34 @@ function QuestionBankTab() {
                   <p className="text-xs text-green-600 font-semibold">Resposta: {q.resposta_correta}</p>
                 )}
               </div>
-              <button
-                onClick={() => handleDelete(q)}
-                className="p-2 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0"
-                title="Remover do banco"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => setEditingQuestion(q)}
+                  className="p-2 rounded-xl text-muted-foreground hover:bg-muted transition-colors"
+                  title="Editar questão"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleDelete(q)}
+                  className="p-2 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                  title="Remover do banco"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           ))}
         </div>
       )}
 
       {showAddModal && <AddQuestionModal onClose={() => setShowAddModal(false)} />}
+      {editingQuestion && (
+        <AddQuestionModal
+          initialQuestion={editingQuestion}
+          onClose={() => setEditingQuestion(undefined)}
+        />
+      )}
     </div>
   );
 }

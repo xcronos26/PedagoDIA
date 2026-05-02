@@ -63,6 +63,18 @@ export function useBulkSaveQuestions() {
   });
 }
 
+export function useUpdateQuestion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: string } & Partial<CreateQuestionInput>) =>
+      apiFetch<Question>(`/questions/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["questions"] }),
+  });
+}
+
 export function useDeleteQuestion() {
   const qc = useQueryClient();
   return useMutation({
