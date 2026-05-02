@@ -1,0 +1,110 @@
+1. Estrutura dos planos (ajuste fino)
+Sua lógica está boa, mas tem um problema clássico: gap de valor entre planos.
+Hoje:
+Free → muito limitado (ok)
+Básico → já libera praticamente tudo
+Médio → só adiciona “compartilhar com pais”
+Avançado → IA
+👉 Problema:
+ O plano Médio está fraco demais. Pouca gente vai pagar upgrade só por compartilhamento.
+Ajuste recomendado:
+Dá mais peso no Médio:
+Free
+1 turma
+até 15 alunos
+até 15 atividades
+sem relatórios
+Básico
+turmas/alunos/atividades ilimitados
+planejamento semanal
+relatório de aluno
+Médio (precisa ficar forte)
+tudo do básico +
+compartilhamento com pais
+histórico de desempenho (evolução do aluno)
+exportação (PDF dos relatórios)
+Avançado
+tudo +
+IA (gerar atividades + planejamento)
+sugestões automáticas
+automações
+👉 Agora sim existe motivo real pra subir de plano.
+
+2. Regra de bloqueio (isso aqui é CRÍTICO)
+Você falou:
+“vence o pagamento → vira free → não pode criar novos, mas não perde dados”
+Perfeito. Só precisa deixar isso mais estruturado:
+Estados do usuário:
+free
+trial (1 mês grátis)
+active (pagando)
+overdue (pagamento falhou)
+Regras:
+trial → acesso TOTAL (plano top)
+active → acesso conforme plano
+overdue → vira comportamento híbrido:
+NÃO pode criar:
+novas turmas
+novos alunos
+novas atividades
+PODE:
+visualizar tudo
+editar parcialmente (opcional)
+👉 Isso evita churn agressivo.
+
+3. Banco de dados (simples e direto)
+Você não precisa complicar.
+Tabela users
+Adiciona:
+plan_type → free | basic | medium | advanced
+plan_status → trial | active | overdue | canceled
+plan_expiration_date
+asaas_customer_id
+asaas_subscription_id
+👉 Isso resolve 90% do controle.
+
+4. Regra de quem já está na base
+Você falou:
+dar 1 mês grátis no plano top
+Perfeito. Só não faz gambiarra.
+Regra limpa:
+Para usuários existentes:
+plan_type = advanced
+plan_status = trial
+plan_expiration_date = hoje + 30 dias
+Novos usuários:
+plan_type = free
+plan_status = active
+
+5. UX de bloqueio (coroa 👑)
+Boa ideia — mas cuidado pra não ficar irritante.
+Onde colocar a coroa:
+Botões bloqueados
+Features premium
+Relatórios (no free)
+Mensagem (importante ser simples):
+“Disponível no plano Básico”
+“Faça upgrade para desbloquear”
+👉 Não escreve textão. Conversão vem de fricção baixa.
+
+6. Página de pagamento (não complica agora)
+Você NÃO precisa de um sistema complexo.
+MVP:
+Página: “Planos”
+Botão: “Assinar”
+Redireciona pro checkout do Asaas
+Depois você evolui pra:
+upgrade dentro da plataforma
+troca de plano
+cancelamento
+👉 Começa simples ou você trava.
+
+7. Lógica de cobrança (essencial)
+Fluxo real:
+Usuário clica em assinar
+Você cria assinatura no Asaas
+Salva subscription_id
+Webhook do Asaas te avisa:
+pagamento confirmado → active
+pagamento falhou → overdue
+👉 Se você não usar webhook, vai quebrar.
