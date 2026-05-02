@@ -201,10 +201,13 @@ export default function AttendanceScreen() {
     if (bulkSelected.length === 0) return;
     setBulkAssigning(true);
     setShowBulkAssignModal(false);
-    await Promise.all(bulkSelected.map(id => moveStudentToClass(id, classId)));
-    setBulkAssigning(false);
-    exitBulkMode();
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    try {
+      await Promise.all(bulkSelected.map(id => moveStudentToClass(id, classId)));
+      exitBulkMode();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } finally {
+      setBulkAssigning(false);
+    }
   }, [bulkSelected, moveStudentToClass, exitBulkMode]);
 
   const handleAddStudent = async () => {
@@ -273,7 +276,7 @@ export default function AttendanceScreen() {
         <View style={styles.headerActions}>
           {bulkMode ? (
             <>
-              <TouchableOpacity style={styles.bulkSelectAllBtn} onPress={allSelected ? exitBulkMode : selectAllBulk} activeOpacity={0.8}>
+              <TouchableOpacity style={styles.bulkSelectAllBtn} onPress={allSelected ? () => setBulkSelected([]) : selectAllBulk} activeOpacity={0.8}>
                 <Text style={styles.bulkSelectAllText}>{allSelected ? 'Desmarcar todos' : 'Selecionar todos'}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.logoutButton} onPress={exitBulkMode} activeOpacity={0.7}>
