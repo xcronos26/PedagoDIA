@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -33,13 +34,15 @@ function formatDateDisplay(dateStr: string) {
 
 type StudentAction = { student: Student; mode: 'options' | 'edit' | 'moveClass' } | null;
 
-function StudentCard({ student, isAbsent, onToggle, onLongPress, className, classColor }: {
+function StudentCard({ student, isAbsent, onToggle, onLongPress, className, classColor, bulkMode, isSelected }: {
   student: Student;
   isAbsent: boolean;
   onToggle: () => void;
   onLongPress: () => void;
   className?: string | null;
   classColor?: string | null;
+  bulkMode?: boolean;
+  isSelected?: boolean;
 }) {
   const scale = useSharedValue(1);
 
@@ -52,6 +55,30 @@ function StudentCard({ student, isAbsent, onToggle, onLongPress, className, clas
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onToggle();
   };
+
+  if (bulkMode) {
+    return (
+      <Animated.View style={animatedStyle}>
+        <TouchableOpacity
+          style={[
+            styles.studentCard,
+            isSelected ? styles.studentCardSelected : styles.studentCardPresent,
+          ]}
+          onPress={handlePress}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.bulkCheckbox, isSelected && styles.bulkCheckboxSelected]}>
+            {isSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
+          </View>
+          <View style={styles.studentNameContainer}>
+            <Text style={[styles.studentName, isSelected && { color: Colors.primary }]} numberOfLines={1}>
+              {student.name}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  }
 
   return (
     <Animated.View style={animatedStyle}>
@@ -120,6 +147,13 @@ export default function AttendanceScreen() {
   const [editName, setEditName] = useState('');
   const [editClassId, setEditClassId] = useState<string | null>(null);
 
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkSelected, setBulkSelected] = useState<string[]>([]);
+  const [bulkAssigning, setBulkAssigning] = useState(false);
+  const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
+
+  const isNoClassView = selectedClassId === NO_CLASS_FILTER;
+
   const hasUnclassifiedStudents = useMemo(() => students.some(s => s.classId === null), [students]);
   const noClassCount = useMemo(() => students.filter(s => s.classId === null).length, [students]);
 
@@ -139,6 +173,39 @@ export default function AttendanceScreen() {
 
   const topPadding = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPadding = Platform.OS === 'web' ? 34 : 0;
+
+  const enterBulkMode = useCallback(() => {
+    setBulkMode(true);
+    setBulkSelected([]);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, []);
+
+  const exitBulkMode = useCallback(() => {
+    setBulkMode(false);
+    setBulkSelected([]);
+  }, []);
+
+  const toggleBulkStudent = useCallback((id: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setBulkSelected(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  }, []);
+
+  const selectAllBulk = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setBulkSelected(filteredStudents.map(s => s.id));
+  }, [filteredStudents]);
+
+  const handleBulkAssign = useCallback(async (classId: string) => {
+    if (bulkSelected.length === 0) return;
+    setBulkAssigning(true);
+    setShowBulkAssignModal(false);
+    await Promise.all(bulkSelected.map(id => moveStudentToClass(id, classId)));
+    setBulkAssigning(false);
+    exitBulkMode();
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }, [bulkSelected, moveStudentToClass, exitBulkMode]);
 
   const handleAddStudent = async () => {
     if (!newStudentName.trim()) return;
@@ -193,6 +260,8 @@ export default function AttendanceScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
   };
 
+  const allSelected = filteredStudents.length > 0 && bulkSelected.length === filteredStudents.length;
+
   return (
     <View style={[styles.container, { paddingTop: topPadding }]}>
       <View style={styles.header}>
@@ -202,32 +271,50 @@ export default function AttendanceScreen() {
           {teacher && <Text style={styles.headerTeacher} numberOfLines={1}>{teacher.name}</Text>}
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.logoutButton}
-            onPress={async () => {
-              await logout();
-              router.replace('/(auth)/login');
-            }}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="log-out-outline" size={20} color={Colors.textSecondary} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.addButton} onPress={() => setShowAddModal(true)} activeOpacity={0.8}>
-            <Ionicons name="add" size={24} color="#fff" />
-          </TouchableOpacity>
+          {bulkMode ? (
+            <>
+              <TouchableOpacity style={styles.bulkSelectAllBtn} onPress={allSelected ? exitBulkMode : selectAllBulk} activeOpacity={0.8}>
+                <Text style={styles.bulkSelectAllText}>{allSelected ? 'Desmarcar todos' : 'Selecionar todos'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.logoutButton} onPress={exitBulkMode} activeOpacity={0.7}>
+                <Ionicons name="close" size={20} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity
+                style={styles.logoutButton}
+                onPress={async () => {
+                  await logout();
+                  router.replace('/(auth)/login');
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="log-out-outline" size={20} color={Colors.textSecondary} />
+              </TouchableOpacity>
+              {isNoClassView && filteredStudents.length > 0 && classes.length > 0 && (
+                <TouchableOpacity style={styles.bulkButton} onPress={enterBulkMode} activeOpacity={0.8}>
+                  <Ionicons name="checkmark-done-outline" size={20} color={Colors.primary} />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.addButton} onPress={() => setShowAddModal(true)} activeOpacity={0.8}>
+                <Ionicons name="add" size={24} color="#fff" />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </View>
 
       <ClassPicker
         classes={classes}
         selectedClassId={selectedClassId}
-        onSelect={setSelectedClassId}
+        onSelect={(id) => { exitBulkMode(); setSelectedClassId(id); }}
         showNoClass={hasUnclassifiedStudents || selectedClassId === NO_CLASS_FILTER}
         noClassCount={noClassCount}
       />
 
       <DataLoadingWrapper isLoaded={isLoaded} loadError={loadError} onRetry={loadData}>
-      {filteredStudents.length > 0 && (
+      {!bulkMode && filteredStudents.length > 0 && (
         <View style={styles.statsRow}>
           <View style={[styles.statBadge, { backgroundColor: Colors.successLight }]}>
             <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
@@ -237,6 +324,17 @@ export default function AttendanceScreen() {
             <Ionicons name="close-circle" size={16} color={Colors.danger} />
             <Text style={[styles.statText, { color: Colors.danger }]}>{absentCount} faltas</Text>
           </View>
+        </View>
+      )}
+
+      {bulkMode && filteredStudents.length > 0 && (
+        <View style={styles.bulkHint}>
+          <Ionicons name="information-circle-outline" size={14} color={Colors.textTertiary} />
+          <Text style={styles.bulkHintText}>
+            {bulkSelected.length === 0
+              ? 'Toque nos alunos para selecioná-los'
+              : `${bulkSelected.length} aluno${bulkSelected.length !== 1 ? 's' : ''} selecionado${bulkSelected.length !== 1 ? 's' : ''}`}
+          </Text>
         </View>
       )}
 
@@ -264,18 +362,47 @@ export default function AttendanceScreen() {
             <StudentCard
               student={item}
               isAbsent={isAbsent(item.id)}
-              onToggle={() => toggleAttendance(item.id, selectedDate)}
-              onLongPress={() => openOptions(item)}
+              onToggle={bulkMode ? () => toggleBulkStudent(item.id) : () => toggleAttendance(item.id, selectedDate)}
+              onLongPress={() => { if (!bulkMode) openOptions(item); }}
               className={!selectedClassId ? classes.find(c => c.id === item.classId)?.name ?? null : null}
               classColor={!selectedClassId ? classes.find(c => c.id === item.classId)?.color ?? null : null}
+              bulkMode={bulkMode}
+              isSelected={bulkSelected.includes(item.id)}
             />
           )}
-          contentContainerStyle={[styles.list, { paddingBottom: bottomPadding + 100 }]}
+          contentContainerStyle={[styles.list, { paddingBottom: bottomPadding + (bulkMode ? 120 : 100) }]}
           showsVerticalScrollIndicator={false}
         />
       )}
 
       </DataLoadingWrapper>
+
+      {/* Bulk action bar */}
+      {bulkMode && (
+        <View style={[styles.bulkBar, { paddingBottom: insets.bottom + 12 }]}>
+          {bulkAssigning ? (
+            <View style={styles.bulkBarInner}>
+              <ActivityIndicator size="small" color="#fff" />
+              <Text style={styles.bulkBarText}>Atribuindo turma…</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.bulkBarBtn, bulkSelected.length === 0 && styles.bulkBarBtnDisabled]}
+              onPress={() => { if (bulkSelected.length > 0) setShowBulkAssignModal(true); }}
+              activeOpacity={0.85}
+              disabled={bulkSelected.length === 0}
+            >
+              <Ionicons name="people-circle-outline" size={20} color="#fff" />
+              <Text style={styles.bulkBarText}>
+                {bulkSelected.length === 0
+                  ? 'Selecione alunos'
+                  : `Atribuir turma (${bulkSelected.length})`}
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color="#fff" />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {/* Add Student Modal */}
       <Modal visible={showAddModal} transparent animationType="slide">
@@ -337,6 +464,36 @@ export default function AttendanceScreen() {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Bulk Assign Class Modal */}
+      <Modal visible={showBulkAssignModal} transparent animationType="slide">
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowBulkAssignModal(false)}>
+          <View style={[styles.modalCard, { paddingBottom: insets.bottom + 16 }]} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Atribuir turma</Text>
+            <Text style={[styles.modalSubtitle, { marginBottom: 12 }]}>
+              {bulkSelected.length} aluno{bulkSelected.length !== 1 ? 's' : ''} selecionado{bulkSelected.length !== 1 ? 's' : ''}
+            </Text>
+            <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+              {classes.map(c => (
+                <TouchableOpacity
+                  key={c.id}
+                  style={styles.bulkClassRow}
+                  onPress={() => handleBulkAssign(c.id)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.bulkClassDot, { backgroundColor: c.color }]} />
+                  <Text style={styles.bulkClassRowText}>{c.name}</Text>
+                  <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={[styles.modalCancelBtn, { marginTop: 8 }]} onPress={() => setShowBulkAssignModal(false)} activeOpacity={0.8}>
+              <Text style={styles.modalCancelText}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
       </Modal>
 
       {/* Student Options / Edit Modal */}
@@ -501,91 +658,155 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
+  bulkButton: {
+    width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.primaryLight,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: Colors.primary + '33',
+  },
+  bulkSelectAllBtn: {
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
+    backgroundColor: Colors.primaryLight, borderWidth: 1.5, borderColor: Colors.primary + '33',
+  },
+  bulkSelectAllText: {
+    fontFamily: 'Inter_600SemiBold', fontSize: 12, color: Colors.primary,
+  },
   statsRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 8, marginTop: 8 },
   statBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   statText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  bulkHint: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 20, paddingVertical: 8,
+  },
+  bulkHintText: {
+    fontSize: 12, fontFamily: 'Inter_400Regular', color: Colors.textTertiary,
+  },
   list: { paddingHorizontal: 16, gap: 8, paddingTop: 4 },
   studentCard: {
     flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, marginBottom: 2, gap: 12,
   },
   studentCardPresent: { backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.border },
-  studentCardAbsent: { backgroundColor: Colors.dangerLight, borderWidth: 1.5, borderColor: '#FFD5D3' },
-  statusIndicator: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  studentCardAbsent: { backgroundColor: Colors.dangerLight, borderWidth: 1.5, borderColor: Colors.danger + '30' },
+  studentCardSelected: { backgroundColor: Colors.primaryLight, borderWidth: 1.5, borderColor: Colors.primary + '50' },
+  statusIndicator: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
+  },
   statusPresent: { backgroundColor: Colors.successLight },
-  statusAbsent: { backgroundColor: '#FFD5D3' },
-  studentNameContainer: { flex: 1, justifyContent: 'center' },
-  studentName: { fontSize: 17, fontFamily: 'Inter_500Medium', color: Colors.text },
+  statusAbsent: { backgroundColor: Colors.dangerLight },
+  bulkCheckbox: {
+    width: 24, height: 24, borderRadius: 12, borderWidth: 2,
+    borderColor: Colors.border, backgroundColor: Colors.surface,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  bulkCheckboxSelected: {
+    backgroundColor: Colors.primary, borderColor: Colors.primary,
+  },
+  studentNameContainer: { flex: 1 },
+  studentName: { fontSize: 15, fontFamily: 'Inter_500Medium', color: Colors.text },
   studentNameAbsent: { color: Colors.danger },
   classBadge: {
     alignSelf: 'flex-start', marginTop: 3,
-    backgroundColor: Colors.surfaceSecondary, borderRadius: 10,
-    paddingHorizontal: 7, paddingVertical: 2,
+    paddingHorizontal: 8, paddingVertical: 2,
+    borderRadius: 8, backgroundColor: Colors.primaryLight,
   },
-  classBadgeText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: Colors.textSecondary },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  classBadgeText: {
+    fontSize: 11, fontFamily: 'Inter_500Medium', color: Colors.primary,
+  },
+  statusBadge: {
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
+  },
   badgePresent: { backgroundColor: Colors.successLight },
-  badgeAbsent: { backgroundColor: '#FFD5D3' },
+  badgeAbsent: { backgroundColor: Colors.dangerLight },
   statusText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   statusTextPresent: { color: Colors.success },
   statusTextAbsent: { color: Colors.danger },
   editIcon: { padding: 4 },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 40 },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
   emptyIcon: {
-    width: 96, height: 96, borderRadius: 48, backgroundColor: Colors.surfaceSecondary,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 8,
+    width: 96, height: 96, borderRadius: 48,
+    backgroundColor: Colors.surfaceSecondary, alignItems: 'center', justifyContent: 'center', marginBottom: 20,
   },
-  emptyTitle: { fontSize: 20, fontFamily: 'Inter_600SemiBold', color: Colors.text, textAlign: 'center' },
-  emptySubtitle: { fontSize: 15, fontFamily: 'Inter_400Regular', color: Colors.textSecondary, textAlign: 'center' },
+  emptyTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: Colors.text, textAlign: 'center', marginBottom: 8 },
+  emptySubtitle: { fontSize: 14, fontFamily: 'Inter_400Regular', color: Colors.textSecondary, textAlign: 'center', marginBottom: 24 },
   emptyButton: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.primary,
-    paddingHorizontal: 24, paddingVertical: 14, borderRadius: 14, marginTop: 8,
-    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.primary, paddingHorizontal: 24, paddingVertical: 14,
+    borderRadius: 16,
   },
-  emptyButtonText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: '#fff' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: Colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 14 },
-  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: 'center', marginBottom: 4 },
-  modalTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', color: Colors.text },
+  emptyButtonText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#fff' },
+  bulkBar: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: Colors.primary,
+    paddingTop: 12, paddingHorizontal: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 8,
+  },
+  bulkBarInner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    paddingVertical: 6,
+  },
+  bulkBarBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 6,
+  },
+  bulkBarBtnDisabled: { opacity: 0.45 },
+  bulkBarText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#fff', flex: 1, textAlign: 'center' },
+  bulkClassRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 14, paddingHorizontal: 4,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  bulkClassDot: { width: 14, height: 14, borderRadius: 7 },
+  bulkClassRowText: { flex: 1, fontSize: 15, fontFamily: 'Inter_500Medium', color: Colors.text },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  modalCard: {
+    backgroundColor: Colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, paddingTop: 12,
+  },
+  modalHandle: {
+    width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border,
+    alignSelf: 'center', marginBottom: 16,
+  },
+  modalTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', color: Colors.text, marginBottom: 16 },
+  modalSubtitle: { fontSize: 14, fontFamily: 'Inter_400Regular', color: Colors.textSecondary },
   modalInput: {
-    backgroundColor: Colors.surfaceSecondary, borderRadius: 12, height: 52,
-    paddingHorizontal: 16, fontSize: 16, fontFamily: 'Inter_400Regular', color: Colors.text,
-    borderWidth: 1.5, borderColor: Colors.border,
+    borderWidth: 1.5, borderColor: Colors.border, borderRadius: 12,
+    padding: 14, fontSize: 15, fontFamily: 'Inter_400Regular', color: Colors.text,
+    backgroundColor: Colors.surfaceSecondary, marginBottom: 16,
   },
   classLabel: { fontSize: 13, fontFamily: 'Inter_500Medium', color: Colors.textSecondary, marginBottom: 8 },
-  classChips: { flexDirection: 'row', gap: 8 },
+  classChips: { gap: 8, paddingBottom: 12 },
   classChip: {
-    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-    backgroundColor: Colors.surfaceSecondary, borderWidth: 1.5, borderColor: Colors.border,
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+    borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.surfaceSecondary,
   },
   classChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  classChipText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textSecondary },
+  classChipText: { fontSize: 13, fontFamily: 'Inter_500Medium', color: Colors.textSecondary },
   classChipTextActive: { color: '#fff' },
-  modalButtons: { flexDirection: 'row', gap: 12 },
+  modalButtons: { flexDirection: 'row', gap: 12, marginTop: 4 },
   modalCancelBtn: {
-    flex: 1, height: 52, alignItems: 'center', justifyContent: 'center',
-    borderRadius: 14, backgroundColor: Colors.surfaceSecondary,
+    flex: 1, paddingVertical: 14, borderRadius: 14,
+    backgroundColor: Colors.surfaceSecondary, alignItems: 'center',
+    borderWidth: 1, borderColor: Colors.border,
   },
-  modalCancelText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: Colors.textSecondary },
+  modalCancelText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: Colors.textSecondary },
   modalConfirmBtn: {
-    flex: 1, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: Colors.primary,
-    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    flex: 1, paddingVertical: 14, borderRadius: 14,
+    backgroundColor: Colors.primary, alignItems: 'center',
   },
-  modalConfirmText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: '#fff' },
+  modalConfirmText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#fff' },
   btnDisabled: { opacity: 0.5 },
   optionRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 14, borderWidth: 1.5,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    padding: 16, borderRadius: 14, marginBottom: 10,
+    borderWidth: 1, borderColor: Colors.border,
   },
-  optionEdit: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary + '60' },
-  optionDelete: { backgroundColor: Colors.dangerLight, borderColor: '#FFD5D3' },
-  optionText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  modalSubtitle: { fontSize: 14, fontFamily: 'Inter_400Regular', color: Colors.textSecondary },
+  optionEdit: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary + '22' },
+  optionDelete: { backgroundColor: Colors.dangerLight, borderColor: Colors.danger + '22' },
+  optionText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   classOptionRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 16,
-    borderRadius: 12, marginBottom: 6, borderWidth: 1.5, borderColor: Colors.border,
-    backgroundColor: Colors.surfaceSecondary,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 14, paddingHorizontal: 4,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
-  classOptionSelected: {
-    backgroundColor: Colors.primaryLight, borderColor: Colors.primary + '60',
-  },
+  classOptionSelected: { backgroundColor: Colors.primaryLight + '40' },
   classOptionText: { flex: 1, fontSize: 15, fontFamily: 'Inter_500Medium', color: Colors.text },
 });
