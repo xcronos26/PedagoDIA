@@ -1,0 +1,141 @@
+Você está trabalhando em um projeto já existente chamado Pedagodia (plataforma edtech). NÃO recrie o sistema do zero.
+Sua tarefa é evoluir o sistema atual para suportar ADMINISTRAÇÃO, DIRETORIA e MULTI-ESCOLA, considerando que neste momento o sistema trabalha apenas com PROFESSORES.
+⚠️ Regras importantes:
+NÃO quebrar funcionalidades atuais
+NÃO remover estruturas existentes
+Trabalhar apenas com professores, escolas e administração
+Preparar estrutura para crescimento futuro
+
+1. Evolução do modelo de usuário
+Atualizar o modelo existente de usuários para incluir:
+role:
+super_admin
+admin_institucional (diretor/coordenador)
+professor
+vínculo:
+individual (professor independente)
+escola (vinculado a uma escola)
+Regras:
+Todos os professores atuais continuam como "individual"
+Nenhum dado atual deve ser alterado ou perdido
+
+2. Implementar estrutura de Escolas (Multi-tenant)
+Criar entidade:
+School:
+id
+name
+invite_code
+status (ativa/inativa)
+created_at
+Criar relacionamento:
+Membership:
+user_id
+school_id
+role (admin_institucional ou professor)
+status (pendente, ativo)
+Regras:
+Professor NÃO cria escola
+Escola pode ser criada por:
+Super Admin
+Admin Institucional
+Professores entram via convite
+
+3. Fluxo de entrada em escola
+Adicionar:
+Campo para inserir código de convite
+Ao inserir:
+Criar membership
+Associar professor à escola
+Atualizar vínculo para "escola"
+Importante:
+NÃO alterar turmas existentes
+Apenas associar o professor à escola
+
+4. Dashboard Super Admin
+Criar área exclusiva para Super Admin:
+Visão geral:
+total de professores
+total de escolas
+total de atividades geradas
+Gestão de professores:
+listar professores
+visualizar:
+turmas
+atividades
+uso do sistema
+Ações:
+resetar senha
+bloquear/desbloquear
+alterar plano (preparar estrutura futura)
+
+5. Dashboard Admin Institucional (Diretoria)
+Criar painel para diretores:
+visualizar professores da escola
+visualizar turmas
+acompanhar uso da plataforma
+Restrições:
+NÃO acessar dados de outras escolas
+NÃO acessar sistema global
+
+6. Gestão de Escolas
+Para Super Admin:
+listar escolas
+visualizar professores vinculados
+Ações:
+ativar/desativar escola
+visualizar uso da escola
+
+7. Preparação para pagamentos (estrutura base)
+Criar:
+subscriptions:
+user_id OU school_id
+plano (free, básico, médio, avançado)
+status
+data_inicio
+data_fim
+coupons:
+código
+tipo (percentual, valor fixo, dias grátis)
+valor
+validade
+
+8. Log de uso da IA (Prompts)
+Criar:
+prompt_logs:
+user_id
+school_id (opcional)
+prompt
+response
+status (sucesso/erro)
+created_at
+Integrar com geração de atividades existente
+
+9. Relatórios (nível professor e escola)
+Permitir visualização:
+atividades geradas por professor
+uso por escola
+frequência de uso
+Sempre separado por:
+professor
+escola
+
+10. Permissões
+Implementar controle simples:
+Super Admin → acesso total
+Admin Institucional → apenas dados da sua escola
+Professor → apenas seus dados
+
+11. Compatibilidade
+Garantir:
+Professores atuais continuam funcionando normalmente
+Sistema funciona mesmo sem escolas criadas
+Nenhuma funcionalidade atual é impactada
+
+Objetivo
+Transformar o sistema atual em uma plataforma preparada para:
+venda para escolas (B2B)
+gestão por diretoria
+controle administrativo
+futura expansão para alunos
+SEM adicionar complexidade desnecessária neste momento.
+

@@ -141,6 +141,11 @@ router.post("/billing/subscribe", requireAuth, async (req, res) => {
     const today = new Date();
     const nextDueDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
+    // Encode planType in externalReference so the webhook can resolve it
+    // deterministically without relying on payment value inference.
+    // Format: "<teacherId>:<planType>" (e.g. "17234abc:medium")
+    const externalRef = `${teacher.id}:${planType}`;
+
     const subscription = await asaasFetch("/subscriptions", {
       method: "POST",
       body: JSON.stringify({
@@ -150,7 +155,7 @@ router.post("/billing/subscribe", requireAuth, async (req, res) => {
         nextDueDate,
         cycle: "MONTHLY",
         description: PLAN_NAMES[planType],
-        externalReference: teacher.id,
+        externalReference: externalRef,
       }),
     });
 
@@ -255,24 +260,40 @@ router.post("/webhooks/asaas", async (req, res) => {
       eventType === "PAYMENT_RECEIVED" ||
       eventType === "PAYMENT_CONFIRMED"
     ) {
-      // Resolve planType from payment value in the webhook payload.
-      // If the value is present, map directly. Otherwise, fetch from Asaas API.
+      // Resolve planType deterministically.
+      // Primary: fetch subscription from Asaas and parse externalReference
+      //   (set at subscribe time as "<teacherId>:<planType>")
+      // Fallback 1: map payment value to plan (60→basic, 80→medium, 100→advanced)
+      // Fallback 2: keep teacher's existing planType unchanged
       let paidPlanType: PlanType | null = null;
 
-      const paymentValue = event.payment?.value ?? event.subscription?.value;
-      if (paymentValue !== undefined) {
-        paidPlanType = VALUE_TO_PLAN[paymentValue] ?? null;
-      }
-
-      if (!paidPlanType && subscriptionId) {
+      if (subscriptionId) {
         try {
           const sub = await asaasFetch(`/subscriptions/${subscriptionId}`);
-          const subValue = sub.value as number | undefined;
-          if (subValue !== undefined) {
-            paidPlanType = VALUE_TO_PLAN[subValue] ?? null;
+          const extRef = sub.externalReference as string | undefined;
+          if (extRef && extRef.includes(":")) {
+            const inferredPlan = extRef.split(":")[1] as PlanType;
+            if (["basic", "medium", "advanced"].includes(inferredPlan)) {
+              paidPlanType = inferredPlan;
+            }
+          }
+          // Value-based fallback if externalReference didn't yield a plan
+          if (!paidPlanType) {
+            const subValue = sub.value as number | undefined;
+            if (subValue !== undefined) {
+              paidPlanType = VALUE_TO_PLAN[subValue] ?? null;
+            }
           }
         } catch {
-          // best-effort — proceed with null
+          // best-effort — proceed with value fallback
+        }
+      }
+
+      // Final fallback: value from the webhook payment object
+      if (!paidPlanType) {
+        const paymentValue = event.payment?.value ?? event.subscription?.value;
+        if (paymentValue !== undefined) {
+          paidPlanType = VALUE_TO_PLAN[paymentValue] ?? null;
         }
       }
 
